@@ -93,7 +93,7 @@ class MongoModel(DBMixin, BasePyDanticModel):
     @classmethod
     def find_with_limit(cls, limit: int = 100, **query):
         data = cls.__query('find', query).limit(limit)
-        return (cls.parse_obj(obj) for obj in data)
+        return QuerySet((cls.parse_obj(obj) for obj in data))
 
     @classmethod
     def insert_one(cls, **query) -> ObjectId:
