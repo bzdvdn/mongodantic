@@ -14,3 +14,7 @@ class NotDeclaredField(BaseMongodanticException):
 
 class InvalidArgument(BaseMongodanticException):
     pass
+
+
+class ValidationError(BaseMongodanticException):
+    pass

@@ -13,7 +13,7 @@ class DBConnection(object):
         self.connection_string = os.environ.get('MONGODANTIC_CONNECTION_STR')
         self.db_name = os.environ.get('MONGODANTIC_DBNAME')
         self.max_pool_size = int(os.environ.get('MONGODANTIC_POOL_SIZE', 100))
-        self.ssl = True if int(os.environ.get('MONGODANTIC_SSL')) else False
+        self.ssl = True if int(os.environ.get('MONGODANTIC_SSL', 0)) else False
         self.ssl_cert_path = os.environ.get('MONGODANTIC_ssl_cert_path')
         self._mongo_connection = self.__init_mongo_connection()
         self.database = self._mongo_connection.get_database(self.db_name)
