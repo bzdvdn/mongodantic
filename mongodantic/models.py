@@ -77,7 +77,8 @@ class BaseModel(DBMixin):
 
     @classmethod
     def insert_one(cls, **query) -> int:
-        data = cls.__query('insert_one', query)
+        obj = cls.parse_obj(query)
+        data = cls.__query('insert_one', obj.data)
         return data.inserted_id
 
     @classmethod
@@ -85,10 +86,10 @@ class BaseModel(DBMixin):
         query = []
         for obj in data:
             if not isinstance(obj, ModelMetaclass):
-                raise InvalidArgument()
+                obj = cls.parse_obj(obj)
             query.append(obj.data)
         r = cls.__query('insert_many', query)
-        return r.inserted_ids
+        return len(r.inserted_ids)
 
     @classmethod
     def delete_one(cls, **query) -> int:
