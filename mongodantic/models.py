@@ -74,7 +74,7 @@ class MongoModel(DBMixin, BaseModel):
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
         if not hasattr(cls, 'collection'):
-            cls.collection = cls._Meta._database.get_collection(cls.__name__)
+            cls.collection = cls._Meta._database.get_collection(cls.__name__.lower())
         if set_values:
             return cls.collection.__getattribute__(method_name)(query_params, set_values)
         if kwargs:
