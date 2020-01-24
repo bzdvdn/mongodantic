@@ -68,7 +68,6 @@ class MongoModel(DBMixin, BasePyDanticModel):
         except ValueError:
             raise ValidationError(f"{field_name} cant be converter to {field_type.__name__}, with value - {value}")
 
-
     @classmethod
     def __query(cls, method_name: str, query_params: Union[list, dict], set_values: Optional[Dict] = None) -> Any:
         if isinstance(query_params, dict):
@@ -145,18 +144,42 @@ class MongoModel(DBMixin, BasePyDanticModel):
         return queries, set_values
 
     @classmethod
-    def _update(cls, method: str,  query: dict) -> int:
+    def _update(cls, method: str, query: dict) -> int:
         query, set_values = cls._ensure_update_data(**query)
         r = cls.__query(method, query, {'$set': set_values})
         return r.modified_count
 
     @classmethod
-    def update_one(cls,  **query) -> int:
+    def update_one(cls, **query) -> int:
         return cls._update('update_one', query)
 
     @classmethod
     def update_many(cls, **query) -> int:
         return cls._update('update_many', query)
+
+    @classmethod
+    def _aggregate(cls, operation: str, agg_field: str, **query) -> int:
+        query = cls.__validate_query_data(query)
+        data = [
+            {"$match": query},
+            {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
+        ]
+        try:
+            return cls.__query("aggregate", data).next()["total"]
+        except StopIteration:
+            return 0
+
+    @classmethod
+    def aggregate_sum(cls, agg_field: str, **query) -> int:
+        return cls._aggregate('sum', agg_field, **query)
+
+    @classmethod
+    def aggregate_max(cls, agg_field: str, **query) -> int:
+        return cls._aggregate('max', agg_field, **query)
+
+    @classmethod
+    def aggregate_min(cls, agg_field: str, **query) -> int:
+        return cls._aggregate('min', agg_field, **query)
 
     @property
     def data(self) -> dict:
