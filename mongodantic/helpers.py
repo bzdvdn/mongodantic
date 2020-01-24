@@ -18,7 +18,6 @@ class ExtraQueryMapper(object):
                 elif extra_method == 'inc':
                     return self.inc(value)
                 query[self.field_name].update(getattr(self, extra_method)(values))
-            print(query)
             return query
         return {}
 

@@ -1,8 +1,8 @@
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
+from pymongo.collection import Collection
 from pymongo.errors import BulkWriteError
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
-from pydantic import validate_model
 from pydantic import BaseModel
 
 from .mixins import DBMixin
@@ -31,6 +31,10 @@ class MongoModel(DBMixin, BaseModel):
             return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
+
+    @classmethod
+    def _get_collection(cls) -> Collection:
+        return cls._Meta._database.get_collection(cls.__name__.lower())
 
     @classmethod
     def parse_obj(cls, data):
@@ -66,9 +70,8 @@ class MongoModel(DBMixin, BaseModel):
                 **kwargs) -> Any:
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
-        if not hasattr(cls, 'collection'):
-            cls.collection = cls._Meta._database.get_collection(cls.__name__.lower())
-        query = getattr(cls.collection, method_name)
+        collection = cls._get_collection()
+        query = getattr(collection, method_name)
         if set_values:
             return query(query_params, set_values)
         if kwargs:
