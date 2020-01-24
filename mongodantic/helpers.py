@@ -1,4 +1,5 @@
 from pydantic.fields import ModelField
+from bson import ObjectId
 
 
 class ExtraQueryMapper(object):
@@ -6,6 +7,8 @@ class ExtraQueryMapper(object):
         self.field_name = field_name
 
     def extra_query(self, extra_method, values) -> dict:
+        if self.field_name == '_id':
+            values = [ObjectId(v) for v in values] if isinstance(values, list) else ObjectId(values)
         if extra_method == "in":
             return {self.field_name: getattr(self, "in_")(values)}
         elif extra_method == 'inc':

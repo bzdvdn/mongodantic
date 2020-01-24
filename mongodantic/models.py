@@ -43,17 +43,15 @@ class MongoModel(DBMixin, BasePyDanticModel):
         return obj
 
     @classmethod
-    def __validate_query_data(cls, query: dict, value_validation: bool = True) -> dict:
+    def __validate_query_data(cls, query: dict, value_validation: bool = False) -> dict:
         data = {}
         for field, value in query.items():
             if '__' in field:
                 extra_fields = field.split("__")
-                name = extra_fields[0]
+                field = extra_fields[0]
                 extra_param = extra_fields[1]
-                _dict = ExtraQueryMapper(name).extra_query(extra_param, value)
-                value = _dict[name]
-            if field == '_id':
-                value = ObjectId(value)
+                _dict = ExtraQueryMapper(field).extra_query(extra_param, value)
+                value = _dict[field]
             elif field not in cls.__fields__:
                 raise NotDeclaredField(field, list(cls.__fields__.keys()))
             data[field] = value if not value_validation else cls.__validate_value(field, value)
@@ -61,8 +59,8 @@ class MongoModel(DBMixin, BasePyDanticModel):
 
     @classmethod
     def __validate_value(cls, field_name: str, value: Any) -> Any:
+        field_type = cls.__fields__[field_name].type_
         try:
-            field_type = cls.__fields__[field_name].type_
             value = field_type(value)
             return value
         except ValueError:
