@@ -46,6 +46,12 @@ class MongoModel(DBMixin, BasePyDanticModel):
     def __validate_query_data(cls, query: dict, value_validation: bool = True) -> dict:
         data = {}
         for field, value in query.items():
+            if '__' in field:
+                extra_fields = field.split("__")
+                name = extra_fields[0]
+                extra_param = extra_fields[1]
+                _dict = ExtraQueryMapper(name).extra_query(extra_param, value)
+                value = _dict[name]
             if field == '_id':
                 value = ObjectId(value)
             elif field not in cls.__fields__:
@@ -133,14 +139,6 @@ class MongoModel(DBMixin, BasePyDanticModel):
                 if extra_fields[1] == "set":
                     _dict = cls.__validate_query_data({extra_fields[0]: value}, value_validation=True)
                     set_values.update(_dict)
-                else:
-                    field = extra_fields[0]
-                    if field not in cls.__fields__ and field != '_id':
-                        raise NotDeclaredField(field, list(cls.__fields__.keys()))
-                    extra_param = extra_fields[1]
-                    queries.update(
-                        ExtraQueryMapper(field).extra_query(extra_param, value)
-                    )
             else:
                 _dict = cls.__validate_query_data({name: value})
                 queries.update(_dict)

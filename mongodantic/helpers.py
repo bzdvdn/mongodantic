@@ -5,7 +5,7 @@ class ExtraQueryMapper(object):
     def __init__(self, field_name):
         self.field_name = field_name
 
-    def extra_query(self, extra_method, values):
+    def extra_query(self, extra_method, values) -> dict:
         if extra_method == "in":
             return {self.field_name: getattr(self, "in_")(values)}
         elif extra_method == 'inc':
