@@ -1,4 +1,3 @@
-import os
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
 from pymongo.collection import Collection
 from pymongo.errors import BulkWriteError
@@ -71,15 +70,15 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def __query(cls, method_name: str, query_params: Union[list, dict, str], set_values: Optional[Dict] = None,
-                background: Optional[bool] = None) -> Any:
+                **kwargs) -> Any:
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
         if not hasattr(cls, 'collection'):
             cls.collection = cls._Meta._database.get_collection(cls.__name__)
         if set_values:
             return cls.collection.__getattribute__(method_name)(query_params, set_values)
-        if background is not None:
-            return cls.collection.__getattribute__(method_name)(query_params, background=background)
+        if kwargs:
+            return cls.collection.__getattribute__(method_name)(query_params, **kwargs)
         return cls.collection.__getattribute__(method_name)(query_params)
 
     @classmethod
@@ -93,12 +92,14 @@ class MongoModel(DBMixin, BaseModel):
         return return_dict
 
     @classmethod
-    def add_index(cls, index_name: str, index_type: int, background: bool = True) -> str:
+    def add_index(cls, index_name: str, index_type: int, background: bool = True, unique: bool = False,
+                  sparse: bool = False) -> str:
         indexes = cls.check_indexes()
         if index_name in indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
-            cls.__query('create_index', [(index_name, index_type)], background=background)
+            cls.__query('create_index', [(index_name, index_type)],
+                        background=background, unique=unique, sparse=sparse)
             return f'index with name - {index_name} created.'
         except Exception as e:
             raise MongoIndexError(f'unknown error, detail: {str(e)}')
