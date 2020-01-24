@@ -5,7 +5,7 @@ from pymongo.errors import BulkWriteError
 from bson import ObjectId
 from pydantic import validate_model
 from pydantic.main import ModelMetaclass
-from pydantic import BaseModel as BasePyDanticModel
+from pydantic import BaseModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
@@ -15,8 +15,10 @@ from .queryset import QuerySet
 
 SetStr = Set[str]
 
+__all__ = ('MongoModel', 'QuerySet')
 
-class MongoModel(DBMixin, BasePyDanticModel):
+
+class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
 
     def __init__(self, **data):
