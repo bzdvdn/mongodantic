@@ -1,9 +1,8 @@
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
-from pymongo.collection import Collection
 from pymongo.errors import BulkWriteError
 from bson import ObjectId
-from pydantic import validate_model
 from pydantic.main import ModelMetaclass
+from pydantic import validate_model
 from pydantic import BaseModel
 
 from .mixins import DBMixin
@@ -25,15 +24,11 @@ class MongoModel(DBMixin, BaseModel):
             self.__dict__: Dict[str, Any] = {}
             self.__fields_set__: 'SetStr' = set()
         if data:
-            values, fields_set, validation_error = validate_model(self.__class__, data)
-            if validation_error:
-                raise validation_error
-            object.__setattr__(self, '__dict__', values)
-            object.__setattr__(self, '__fields_set__', fields_set)
+            super().__init__(**data)
 
     def __setattr__(self, key, value):
         if key != '_id':
-            return super(MongoModel, self).__setattr__(key, value)
+            return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
 
@@ -48,14 +43,12 @@ class MongoModel(DBMixin, BaseModel):
     def __validate_query_data(cls, query: dict, value_validation: bool = False) -> dict:
         data = {}
         for field, value in query.items():
-            if '__' in field:
-                extra_fields = field.split("__")
-                field = extra_fields[0]
-                extra_param = extra_fields[1]
-                _dict = ExtraQueryMapper(field).extra_query(extra_param, value)
-                value = _dict[field]
-            elif field not in cls.__fields__:
+            field, *extra_params = field.split("__")
+            if field not in cls.__fields__:
                 raise NotDeclaredField(field, list(cls.__fields__.keys()))
+            _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
+            if _dict:
+                value = _dict[field]
             data[field] = value if not value_validation else cls.__validate_value(field, value)
         return data
 
@@ -75,11 +68,12 @@ class MongoModel(DBMixin, BaseModel):
             query_params = cls.__validate_query_data(query_params)
         if not hasattr(cls, 'collection'):
             cls.collection = cls._Meta._database.get_collection(cls.__name__.lower())
+        query = getattr(cls.collection, method_name)
         if set_values:
-            return cls.collection.__getattribute__(method_name)(query_params, set_values)
+            return query(query_params, set_values)
         if kwargs:
-            return cls.collection.__getattribute__(method_name)(query_params, **kwargs)
-        return cls.collection.__getattribute__(method_name)(query_params)
+            return query(query_params, **kwargs)
+        return query(query_params)
 
     @classmethod
     def check_indexes(cls) -> dict:

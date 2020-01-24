@@ -7,14 +7,20 @@ class ExtraQueryMapper(object):
     def __init__(self, field_name):
         self.field_name = field_name
 
-    def extra_query(self, extra_method, values) -> dict:
+    def extra_query(self, extra_methods: list, values) -> dict:
         if self.field_name == '_id':
             values = [ObjectId(v) for v in values] if isinstance(values, list) else ObjectId(values)
-        if extra_method == "in":
-            return {self.field_name: getattr(self, "in_")(values)}
-        elif extra_method == 'inc':
-            return self.inc(value)
-        return {self.field_name: getattr(self, extra_method)(values)}
+        if extra_methods:
+            query = {self.field_name: {}}
+            for extra_method in extra_methods:
+                if extra_method == 'in':
+                    extra_method = 'in_'
+                elif extra_method == 'inc':
+                    return self.inc(value)
+                query[self.field_name].update(getattr(self, extra_method)(values))
+            print(query)
+            return query
+        return {}
 
     def in_(self, list_values):
         if not isinstance(list_values, list):

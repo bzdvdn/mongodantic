@@ -1,7 +1,7 @@
 # mongodantic
 
 ## Usage
-in main file application
+in your main file application
 ```python
 from mongodantic import init_db_connection_params
 connection_str = '<your connection url>'
