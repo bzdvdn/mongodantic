@@ -1,5 +1,6 @@
 from pydantic.fields import ModelField
 from bson import ObjectId
+from pymongo import UpdateOne
 
 
 class ExtraQueryMapper(object):
@@ -71,3 +72,20 @@ class ExtraQueryMapper(object):
         return {"$gte": from_, "$lte": to_}
 
 
+def chunk_by_length(items: list, step: int):
+    """Yield successive n-sized chunks from l."""
+    for i in range(0, len(items), step):
+        yield items[i: i + step]
+
+
+def bulk_update_query_generator(requests: list, updated_fields: list) -> list:
+    data = []
+    for obj in requests:
+        query = obj.data
+        query['_id'] = ObjectId(query['_id'])
+        update = {}
+        for field in updated_fields:
+            value = query.pop(field)
+            update.update({field: value})
+        data.append(UpdateOne(query, {'$set': update}))
+    return data

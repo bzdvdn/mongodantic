@@ -1,6 +1,7 @@
 import os
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
 from pymongo.collection import Collection
+from pymongo.errors import BulkWriteError
 from bson import ObjectId
 from pydantic import validate_model
 from pydantic.main import ModelMetaclass
@@ -9,7 +10,7 @@ from pydantic import BaseModel as BasePyDanticModel
 from .mixins import DBMixin
 from .types import ObjectIdStr
 from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError
-from .helpers import ExtraQueryMapper
+from .helpers import ExtraQueryMapper, chunk_by_length, bulk_update_query_generator
 from .queryset import QuerySet
 
 SetStr = Set[str]
@@ -31,7 +32,7 @@ class MongoModel(DBMixin, BasePyDanticModel):
 
     def __setattr__(self, key, value):
         if key != '_id':
-            return super(BaseModel, self).__setattr__(key, value)
+            return super(MongoModel, self).__setattr__(key, value)
         self.__dict__[key] = value
         return value
 
@@ -195,6 +196,15 @@ class MongoModel(DBMixin, BasePyDanticModel):
             return cls.__query("aggregate", data).next()["total"]
         except StopIteration:
             return 0
+
+    @classmethod
+    def bulk_update(cls, models: List, updated_fields: list, batch_size: Optional[int] = None) -> None:
+        if batch_size is not None and batch_size > 0:
+            for requests in chunk_by_length(models, batch_size):
+                data = bulk_update_query_generator(requests, updated_fields)
+                cls.__query('bulk_write', data)
+        data = bulk_update_query_generator(models, updated_fields)
+        cls.__query('bulk_write', data)
 
     @classmethod
     def aggregate_sum(cls, agg_field: str, **query) -> int:
