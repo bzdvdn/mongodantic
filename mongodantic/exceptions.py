@@ -18,3 +18,7 @@ class InvalidArgument(BaseMongodanticException):
 
 class ValidationError(BaseMongodanticException):
     pass
+
+
+class MongoIndexError(BaseMongodanticException):
+    pass

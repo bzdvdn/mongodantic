@@ -8,7 +8,7 @@ from pydantic import BaseModel as BasePyDanticModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
-from .exceptions import NotDeclaredField, InvalidArgument, ValidationError
+from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError
 from .helpers import ExtraQueryMapper
 from .queryset import QuerySet
 
@@ -30,7 +30,7 @@ class MongoModel(DBMixin, BasePyDanticModel):
             object.__setattr__(self, '__fields_set__', fields_set)
 
     def __setattr__(self, key, value):
-        if key not in ('_id',):
+        if key != '_id':
             return super(BaseModel, self).__setattr__(key, value)
         self.__dict__[key] = value
         return value
@@ -67,14 +67,43 @@ class MongoModel(DBMixin, BasePyDanticModel):
             raise ValidationError(f"{field_name} cant be converter to {field_type.__name__}, with value - {value}")
 
     @classmethod
-    def __query(cls, method_name: str, query_params: Union[list, dict], set_values: Optional[Dict] = None) -> Any:
+    def __query(cls, method_name: str, query_params: Union[list, dict, str], set_values: Optional[Dict] = None,
+                background: Optional[bool] = None) -> Any:
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
         if not hasattr(cls, 'collection'):
             cls.collection = cls._Meta._database.get_collection(cls.__name__)
         if set_values:
             return cls.collection.__getattribute__(method_name)(query_params, set_values)
+        if background is not None:
+            return cls.collection.__getattribute__(method_name)(query_params, background=background)
         return cls.collection.__getattribute__(method_name)(query_params)
+
+    @classmethod
+    def check_indexes(cls) -> dict:
+        index_list = list(cls.__query('list_indexes', {}))
+        return_dict = {}
+        for index in index_list:
+            d = dict(index)
+            _dict = {'name': d['name'], 'key': dict(d['key'])}
+            return_dict.update(_dict)
+        return return_dict
+
+    @classmethod
+    def add_index(cls, index_name: str, index_type: int, background: bool = True) -> str:
+        indexes = cls.check_indexes()
+        if index_name in indexes:
+            raise MongoIndexError(f'{index_name} - already exists.')
+        try:
+            cls.__query('create_index', [(index_name, index_type)], background=background)
+            return f'index with name - {index_name} created.'
+        except Exception as e:
+            raise MongoIndexError(f'unknown error, detail: {str(e)}')
+
+    @classmethod
+    def drop_index(cls, index_name: str) -> str:
+        cls.__query('drop_index', index_name)
+        return f'{index_name} dropped.'
 
     @classmethod
     def count(cls, **query) -> int:
