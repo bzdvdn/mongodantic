@@ -1,13 +1,14 @@
+from typing import List, Any, Dict, Tuple, Union
 from pydantic.fields import ModelField
 from bson import ObjectId
 from pymongo import UpdateOne
 
 
 class ExtraQueryMapper(object):
-    def __init__(self, field_name):
+    def __init__(self, field_name: str):
         self.field_name = field_name
 
-    def extra_query(self, extra_methods: list, values) -> dict:
+    def extra_query(self, extra_methods: List, values) -> Dict:
         if self.field_name == '_id':
             values = [ObjectId(v) for v in values] if isinstance(values, list) else ObjectId(values)
         if extra_methods:
@@ -21,55 +22,55 @@ class ExtraQueryMapper(object):
             return query
         return {}
 
-    def in_(self, list_values):
+    def in_(self, list_values: List):
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
         return {"$in": list_values}
 
-    def regex(self, regex_value):
+    def regex(self, regex_value: str):
         return {"$regex": regex_value}
 
-    def regex_ne(self, regex_value):
+    def regex_ne(self, regex_value: str):
         return {"not": {"$regex": regex_value}}
 
-    def ne(self, value):
+    def ne(self, value: Any):
         return {"$ne": value}
 
-    def startswith(self, value):
+    def startswith(self, value: str):
         return {"$regex": f"^{value}"}
 
-    def endswith(self, value):
+    def endswith(self, value: str):
         return {"$regex": f"{value}$"}
 
-    def nin(self, list_values):
+    def nin(self, list_values: List):
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
         return {"$nin": list_values}
 
-    def exists(self, boolean_value):
+    def exists(self, boolean_value: bool):
         return {"$exists": boolean_value}
 
     def type(self, bson_type):
         return {"$type": bson_type}
 
-    def gte(self, value):
+    def gte(self, value: Any):
         return {"$gte": value}
 
-    def lte(self, value):
+    def lte(self, value: Any):
         return {"$lte": value}
 
-    def gt(self, value):
+    def gt(self, value: Any):
         return {"$gt": value}
 
-    def lt(self, value):
+    def lt(self, value: Any):
         return {"$lt": value}
 
-    def inc(self, value):
+    def inc(self, value: int):
         if isinstance(value, int):
             return {'$inc': {self.field_name: value}}
         raise ValueError('value must be integer')
 
-    def range(self, range_values):
+    def range(self, range_values: Union[List, Tuple]):
         if len(range_values) != 2:
             raise ValueError("range must have 2 params")
         from_ = range_values[0]
@@ -77,13 +78,13 @@ class ExtraQueryMapper(object):
         return {"$gte": from_, "$lte": to_}
 
 
-def chunk_by_length(items: list, step: int):
+def chunk_by_length(items: List, step: int):
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(items), step):
         yield items[i: i + step]
 
 
-def bulk_update_query_generator(requests: list, updated_fields: list) -> list:
+def bulk_update_query_generator(requests: List, updated_fields: List) -> List:
     data = []
     for obj in requests:
         query = obj.data
