@@ -48,7 +48,7 @@ class MongoModel(DBMixin, BaseModel):
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
-            if field not in cls.__fields__:
+            if field not in cls.__fields__ and field != '_id':
                 raise NotDeclaredField(field, list(cls.__fields__.keys()))
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
             if _dict:
@@ -221,3 +221,15 @@ class MongoModel(DBMixin, BaseModel):
     @property
     def data(self) -> dict:
         return self.dict()
+
+    def save(self):
+        if self._id is not None:
+            data = {'_id': ObjectId(self._id)}
+            for field in self.__fields__:
+                data[f'{field}__set'] = getattr(self, field)
+            self.update_one(**data)
+            return self
+        data = {field:value for field, value in self.__dict__.items() if field in self.__fields__}
+        object_id = self.insert_one(**data)
+        self._id = str(object_id)
+        return self
