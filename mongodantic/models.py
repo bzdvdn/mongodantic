@@ -37,14 +37,14 @@ class MongoModel(DBMixin, BaseModel):
         return cls._Meta._database.get_collection(cls.__name__.lower())
 
     @classmethod
-    def parse_obj(cls, data):
+    def parse_obj(cls, data: Any) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = str(data['_id'])
         return obj
 
     @classmethod
-    def __validate_query_data(cls, query: dict, value_validation: bool = False) -> dict:
+    def __validate_query_data(cls, query: Dict, value_validation: bool = False) -> Dict:
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
@@ -66,7 +66,7 @@ class MongoModel(DBMixin, BaseModel):
             raise ValidationError(f"{field_name} cant be converter to {field_type.__name__}, with value - {value}")
 
     @classmethod
-    def __query(cls, method_name: str, query_params: Union[list, dict, str], set_values: Optional[Dict] = None,
+    def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
                 **kwargs) -> Any:
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
@@ -79,7 +79,7 @@ class MongoModel(DBMixin, BaseModel):
         return query(query_params)
 
     @classmethod
-    def check_indexes(cls) -> dict:
+    def check_indexes(cls) -> Dict:
         index_list = list(cls.__query('list_indexes', {}))
         return_dict = {}
         for index in index_list:
@@ -99,7 +99,7 @@ class MongoModel(DBMixin, BaseModel):
                         background=background, unique=unique, sparse=sparse)
             return f'index with name - {index_name} created.'
         except Exception as e:
-            raise MongoIndexError(f'unknown error, detail: {str(e)}')
+            raise MongoIndexError(f'detail: {str(e)}')
 
     @classmethod
     def drop_index(cls, index_name: str) -> str:
@@ -150,7 +150,7 @@ class MongoModel(DBMixin, BaseModel):
         return r.deleted_count
 
     @classmethod
-    def delete_many(cls, **query):
+    def delete_many(cls, **query) -> int:
         r = cls.__query('delete_many', query)
         return r.deleted_count
 
@@ -172,7 +172,23 @@ class MongoModel(DBMixin, BaseModel):
         return queries, set_values
 
     @classmethod
-    def _update(cls, method: str, query: dict) -> int:
+    def replace_one(cls, replacement: Dict, upsert: bool = False, **filter_query) -> Any:
+        if not filter_query:
+            raise AttributeError('not filter parameters')
+        if not replacement:
+            raise AttributeError('not replacement parameters')
+        filter_query = cls.__validate_query_data(filter_query)
+        replacement = cls.__validate_query_data(replacement)
+        return cls.__query('replace_one', filter_query, replacement=replacement, upsert=upsert)
+
+    @classmethod
+    def raw_query(cls, method_name: str, raw_query: Union[Dict, List]) -> Any:
+        collection = cls._get_collection()
+        query = getattr(collection, method_name)
+        return query(raw_query)
+
+    @classmethod
+    def _update(cls, method: str, query: Dict) -> int:
         query, set_values = cls._ensure_update_data(**query)
         r = cls.__query(method, query, {'$set': set_values})
         return r.modified_count
@@ -198,7 +214,7 @@ class MongoModel(DBMixin, BaseModel):
             return 0
 
     @classmethod
-    def bulk_update(cls, models: List, updated_fields: list, batch_size: Optional[int] = None) -> None:
+    def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
                 data = bulk_update_query_generator(requests, updated_fields)
@@ -219,17 +235,17 @@ class MongoModel(DBMixin, BaseModel):
         return cls._aggregate('min', agg_field, **query)
 
     @property
-    def data(self) -> dict:
+    def data(self) -> Dict:
         return self.dict()
 
-    def save(self):
+    def save(self) -> Any:
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
             for field in self.__fields__:
                 data[f'{field}__set'] = getattr(self, field)
             self.update_one(**data)
             return self
-        data = {field:value for field, value in self.__dict__.items() if field in self.__fields__}
+        data = {field: value for field, value in self.__dict__.items() if field in self.__fields__}
         object_id = self.insert_one(**data)
         self._id = str(object_id)
         return self
