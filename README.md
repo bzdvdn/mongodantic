@@ -1,6 +1,6 @@
 # mongodantic
 
-## Usage
+## Settings
 in your main file application
 ```python
 from mongodantic import init_db_connection_params

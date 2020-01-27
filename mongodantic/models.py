@@ -182,7 +182,12 @@ class MongoModel(DBMixin, BaseModel):
         return cls.__query('replace_one', filter_query, replacement=replacement, upsert=upsert)
 
     @classmethod
-    def raw_query(cls, method_name: str, raw_query: Union[Dict, List]) -> Any:
+    def raw_query(cls, method_name: str, raw_query: Union[Dict, List[Dict]]) -> Any:
+        if 'insert' in method_name or 'replace' in method_name or 'update' in method_name:
+            if isinstance(raw_query, list):
+                raw_query = [cls.__validate_query_data(row) for row in raw_query]
+            else:
+                raw_query = cls.__validate_query_data(raw_query)
         collection = cls._get_collection()
         query = getattr(collection, method_name)
         return query(raw_query)
