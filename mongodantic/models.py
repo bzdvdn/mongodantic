@@ -214,13 +214,14 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def _bulk_operation(cls, models: List, updated_fields: Optional[List] = None,
-                        query_fields: Optional[List] = None, batch_size: Optional[int] = None) -> None:
+                        query_fields: Optional[List] = None, batch_size: Optional[int] = None,
+                        upsert: bool = False) -> None:
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
                 data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields)
                 cls.__query('bulk_write', data)
         data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields)
-        cls.__query('bulk_write', data, upsert=True)
+        cls.__query('bulk_write', data, upsert=upsert)
 
     @classmethod
     def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:
@@ -228,7 +229,7 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def bulk_update_or_create(cls, models: List, query_fields: List, batch_size: Optional[int] = None) -> None:
-        return cls._bulk_operation(models, query_fields=query_fields, batch_size=batch_size)
+        return cls._bulk_operation(models, query_fields=query_fields, batch_size=batch_size, upsert=True)
 
     @classmethod
     def aggregate_sum(cls, agg_field: str, **query) -> int:
