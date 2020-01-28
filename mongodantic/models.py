@@ -19,13 +19,6 @@ __all__ = ('MongoModel', 'QuerySet')
 class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
 
-    def __init__(self, **data):
-        if TYPE_CHECKING:
-            self.__dict__: Dict[str, Any] = {}
-            self.__fields_set__: 'SetStr' = set()
-        if data:
-            super().__init__(**data)
-
     def __setattr__(self, key, value):
         if key != '_id':
             return super().__setattr__(key, value)
@@ -53,17 +46,18 @@ class MongoModel(DBMixin, BaseModel):
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
             if _dict:
                 value = _dict[field]
+            elif field == '_id':
+                value = ObjectId(value)
             data[field] = value if not value_validation else cls.__validate_value(field, value)
         return data
 
     @classmethod
     def __validate_value(cls, field_name: str, value: Any) -> Any:
-        field_type = cls.__fields__[field_name].type_
-        try:
-            value = field_type(value)
-            return value
-        except ValueError:
-            raise ValidationError(f"{field_name} cant be converter to {field_type.__name__}, with value - {value}")
+        field = cls.__fields__[field_name]
+        value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
+        if error_:
+            raise ValidationError([error_], type(cls))
+        return value
 
     @classmethod
     def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
