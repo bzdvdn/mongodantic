@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from .mixins import DBMixin
 from .types import ObjectIdStr
 from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError
-from .helpers import ExtraQueryMapper, chunk_by_length, bulk_update_query_generator
+from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator
 from .queryset import QuerySet
 
 SetStr = Set[str]
@@ -213,13 +213,22 @@ class MongoModel(DBMixin, BaseModel):
             return 0
 
     @classmethod
-    def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:
+    def _bulk_operation(cls, models: List, updated_fields: Optional[List] = None,
+                        query_fields: Optional[List] = None, batch_size: Optional[int] = None) -> None:
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
-                data = bulk_update_query_generator(requests, updated_fields)
+                data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields)
                 cls.__query('bulk_write', data)
-        data = bulk_update_query_generator(models, updated_fields)
-        cls.__query('bulk_write', data)
+        data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields)
+        cls.__query('bulk_write', data, upsert=True)
+
+    @classmethod
+    def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:
+        return cls._bulk_operation(models, updated_fields=updated_fields, batch_size=batch_size)
+
+    @classmethod
+    def bulk_update_or_create(cls, models: List, query_fields: List, batch_size: Optional[int] = None) -> None:
+        return cls._bulk_operation(models, query_fields=query_fields, batch_size=batch_size)
 
     @classmethod
     def aggregate_sum(cls, agg_field: str, **query) -> int:

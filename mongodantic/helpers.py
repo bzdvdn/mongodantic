@@ -1,4 +1,4 @@
-from typing import List, Any, Dict, Tuple, Union
+from typing import List, Any, Dict, Tuple, Union, Optional
 from pydantic.fields import ModelField
 from bson import ObjectId
 from pymongo import UpdateOne
@@ -84,14 +84,25 @@ def chunk_by_length(items: List, step: int):
         yield items[i: i + step]
 
 
-def bulk_update_query_generator(requests: List, updated_fields: List) -> List:
+def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
+                         query_fields: Optional[List] = None) -> List:
     data = []
-    for obj in requests:
-        query = obj.data
-        query['_id'] = ObjectId(query['_id'])
-        update = {}
-        for field in updated_fields:
-            value = query.pop(field)
-            update.update({field: value})
-        data.append(UpdateOne(query, {'$set': update}))
+    if updated_fields:
+        for obj in requests:
+            query = obj.data
+            query['_id'] = ObjectId(query['_id'])
+            update = {}
+            for field in updated_fields:
+                value = query.pop(field)
+                update.update({field: value})
+                data.append(UpdateOne(query, {'$set': update}))
+    elif query_fields:
+        for obj in requests:
+            query = obj.data
+            update = {}
+            for field in query:
+                if field not in query_fields:
+                    value = query.pop(field)
+                    update.update({field: value})
+                    data.append(UpdateOne(query, {'$set': update}))
     return data
