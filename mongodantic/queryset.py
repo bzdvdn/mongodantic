@@ -1,4 +1,4 @@
-from typing import Generator
+from typing import Generator, List
 
 
 class QuerySet(object):
@@ -9,11 +9,19 @@ class QuerySet(object):
         return (obj for obj in self._data)
 
     @property
-    def data(self) -> Generator:
+    def data(self) -> List:
+        return [obj.data for obj in self._data]
+
+    @property
+    def generator(self) -> Generator:
+        return (obj for obj in self._data)
+
+    @property
+    def data_generator(self) -> Generator:
         return (obj.data for obj in self._data)
 
     @property
-    def list(self) -> list:
+    def list(self) -> List:
         return [obj for obj in self._data]
 
     def first(self) -> any:
