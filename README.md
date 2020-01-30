@@ -26,9 +26,11 @@ class Banner(MongoModel):
 ```python
 banner = Banner.find_one() # return a banner model obj
 banner_data = Banner.find_one().data # return a dict
-banners_generator = Banner.find() # return generator
-banners_dict_generator = Banner.find().data
+banners_queryset= Banner.find() # return QuerySet object
+banners_dict = Banner.find().data
 list_of_banners = Banner.find().list
+banners_generator = Banner.find().generator # generator of Banner objects
+banners_generator_of_dicts = Banner.find().data_generator # generator of Banner objects
 
 # count
 count = Banner.count(name='test')

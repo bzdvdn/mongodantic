@@ -66,11 +66,12 @@ class MongoModel(DBMixin, BaseModel):
             query_params = cls.__validate_query_data(query_params)
         collection = cls._get_collection()
         query = getattr(collection, method_name)
+        data = (query_params, )
         if set_values:
-            return query(query_params, set_values)
+            data = (query_params, set_values)
         if kwargs:
-            return query(query_params, **kwargs)
-        return query(query_params)
+            return query(*data, **kwargs)
+        return query(*data)
 
     @classmethod
     def check_indexes(cls) -> Dict:
