@@ -65,13 +65,13 @@ class MongoModel(DBMixin, BaseModel):
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
         collection = cls._get_collection()
-        query = getattr(collection, method_name)
-        data = (query_params, )
+        method = getattr(collection, method_name)
+        query = (query_params, )
         if set_values:
-            data = (query_params, set_values)
+            query = (query_params, set_values)
         if kwargs:
-            return query(*data, **kwargs)
-        return query(*data)
+            return method(*query, **kwargs)
+        return method(*query)
 
     @classmethod
     def check_indexes(cls) -> Dict:
@@ -180,7 +180,7 @@ class MongoModel(DBMixin, BaseModel):
     def raw_query(cls, method_name: str, raw_query: Union[Dict, List[Dict]]) -> Any:
         if 'insert' in method_name or 'replace' in method_name or 'update' in method_name:
             if isinstance(raw_query, list):
-                raw_query = [cls.__validate_query_data(row) for row in raw_query]
+                raw_query = list(map(cls.__validate_query_data, raw_query))
             else:
                 raw_query = cls.__validate_query_data(raw_query)
         collection = cls._get_collection()

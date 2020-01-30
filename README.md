@@ -81,4 +81,16 @@ Banner.bulk_update(banners, updated_fields=['banner_id'])
 
 banners = [Banner(banner_id=23, name='new', utms={}), Banner(banner_id=1, name='test', utms={})]
 Banner.bulk_update_or_create(banners, query_fields=['banner_id'])
+
+# aggregate
+class Stats(MongoModel):
+    id: int
+    cost: float
+    clicks: int
+    shows: int
+    date: str
+
+Stats.aggregate_sum(date='2020-01-20', agg_field='cost')
+Stats.aggregate_min(date='2020-01-20', agg_field='clicks')
+Stats.aggregate_max(date='2020-01-20', agg_field='shows')
 ```
