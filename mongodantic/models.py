@@ -226,10 +226,14 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:
+        if not updated_fields:
+            raise ValidationError('updated_fields cannot be empty')
         return cls._bulk_operation(models, updated_fields=updated_fields, batch_size=batch_size)
 
     @classmethod
     def bulk_update_or_create(cls, models: List, query_fields: List, batch_size: Optional[int] = None) -> None:
+        if not query_fields:
+            raise ValidationError('query_fields cannot be empty')
         return cls._bulk_operation(models, query_fields=query_fields, batch_size=batch_size, upsert=True)
 
     @classmethod
