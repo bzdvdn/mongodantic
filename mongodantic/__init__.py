@@ -1,4 +1,4 @@
 from .connection import init_db_connection_params
 
-__version_ = '0.0.1b'
+__version__ = '0.0.1b1'
 __author__ = 'bzdvdn'
