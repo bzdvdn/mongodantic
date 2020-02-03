@@ -224,11 +224,12 @@ class MongoModel(DBMixin, BaseModel):
                         upsert: bool = False) -> None:
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
-                data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields)
+                data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields,
+                                            upsert=upsert)
                 cls.__query('bulk_write', data)
             return None
-        data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields)
-        cls.__query('bulk_write', data, upsert=upsert)
+        data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields, upsert=upsert)
+        cls.__query('bulk_write', data)
 
     @classmethod
     def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None) -> None:

@@ -85,7 +85,7 @@ def chunk_by_length(items: List, step: int):
 
 
 def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
-                         query_fields: Optional[List] = None) -> List:
+                         query_fields: Optional[List] = None, upsert=False) -> List:
     data = []
     if updated_fields:
         for obj in requests:
@@ -95,14 +95,16 @@ def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
             for field in updated_fields:
                 value = query.pop(field)
                 update.update({field: value})
-                data.append(UpdateOne(query, {'$set': update}))
+            data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
     elif query_fields:
         for obj in requests:
-            query = obj.data
+            query = {}
             update = {}
-            for field in query:
+            for field, value in obj.data.items():
                 if field not in query_fields:
-                    value = query.pop(field)
                     update.update({field: value})
-                    data.append(UpdateOne(query, {'$set': update}))
+                else:
+                    query.update({field: value})
+            print(query)
+            data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
     return data
