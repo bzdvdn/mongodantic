@@ -31,7 +31,7 @@ class MongoModel(DBMixin, BaseModel):
 
 
     @classmethod
-    def _get_collection(cls) -> Collection:
+    def __get_collection(cls) -> Collection:
         return cls._Meta._database.get_collection(cls.set_collection_name())
 
     @classmethod
@@ -69,7 +69,7 @@ class MongoModel(DBMixin, BaseModel):
                 **kwargs) -> Any:
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
-        collection = cls._get_collection()
+        collection = cls.__get_collection()
         method = getattr(collection, method_name)
         query = (query_params, )
         if set_values:
@@ -188,7 +188,7 @@ class MongoModel(DBMixin, BaseModel):
                 raw_query = list(map(cls.__validate_query_data, raw_query))
             else:
                 raw_query = cls.__validate_query_data(raw_query)
-        collection = cls._get_collection()
+        collection = cls.__get_collection()
         query = getattr(collection, method_name)
         return query(raw_query)
 
