@@ -20,6 +20,17 @@ class Banner(MongoModel):
     banner_id: str
     name: str
     utm: dict
+
+# if you need take an existing collection, you must reimplement set_collection_name method like that
+class Benner(MongoModel):
+    ...
+
+    @classmethod
+    def set_collection_name(cls) -> str:
+        return 'banner_test'
+    
+
+
 ```
 
 ## Queries

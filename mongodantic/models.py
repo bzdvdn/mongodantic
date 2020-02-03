@@ -26,8 +26,13 @@ class MongoModel(DBMixin, BaseModel):
         return value
 
     @classmethod
+    def set_collection_name(cls) -> str:
+        return cls.__name__.lower()
+
+
+    @classmethod
     def _get_collection(cls) -> Collection:
-        return cls._Meta._database.get_collection(cls.__name__.lower())
+        return cls._Meta._database.get_collection(cls.set_collection_name())
 
     @classmethod
     def parse_obj(cls, data: Any) -> Any:
