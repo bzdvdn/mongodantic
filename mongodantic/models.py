@@ -226,6 +226,7 @@ class MongoModel(DBMixin, BaseModel):
             for requests in chunk_by_length(models, batch_size):
                 data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields)
                 cls.__query('bulk_write', data)
+            return None
         data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields)
         cls.__query('bulk_write', data, upsert=upsert)
 
