@@ -268,5 +268,5 @@ class MongoModel(DBMixin, BaseModel):
             return self
         data = {field: value for field, value in self.__dict__.items() if field in self.__fields__}
         object_id = self.insert_one(**data)
-        self._id = str(object_id)
+        self._id = object_id.__str__()
         return self
