@@ -1,6 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
 from pymongo.collection import Collection
-from pymongo.errors import BulkWriteError
+from pymongo.errors import BulkWriteError, NetworkTimeout
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
 from pydantic import BaseModel
@@ -74,9 +74,13 @@ class MongoModel(DBMixin, BaseModel):
         query = (query_params, )
         if set_values:
             query = (query_params, set_values)
-        if kwargs:
-            return method(*query, **kwargs)
-        return method(*query)
+        try:
+            if kwargs:
+                return method(*query, **kwargs)
+            return method(*query)
+        except NetworkTimeout:
+            cls._reconnect()
+            return cls.__query(method_name, query_params, set_values, **kwargs)
 
     @classmethod
     def check_indexes(cls) -> Dict:
