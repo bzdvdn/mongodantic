@@ -29,7 +29,6 @@ class MongoModel(DBMixin, BaseModel):
     def set_collection_name(cls) -> str:
         return cls.__name__.lower()
 
-
     @classmethod
     def __get_collection(cls) -> Collection:
         return cls._Meta._database.get_collection(cls.set_collection_name())
@@ -71,7 +70,7 @@ class MongoModel(DBMixin, BaseModel):
             query_params = cls.__validate_query_data(query_params)
         collection = cls.__get_collection()
         method = getattr(collection, method_name)
-        query = (query_params, )
+        query = (query_params,)
         if set_values:
             query = (query_params, set_values)
         try:
@@ -123,13 +122,12 @@ class MongoModel(DBMixin, BaseModel):
         return None
 
     @classmethod
-    def find(cls, **query) -> QuerySet:
+    def find(cls, skip_rows: Optional[int] = None, limit_rows: Optional[int] = None, **query) -> QuerySet:
         data = cls.__query('find', query)
-        return QuerySet((cls.parse_obj(obj) for obj in data))
-
-    @classmethod
-    def find_with_limit(cls, limit: int = 100, **query):
-        data = cls.__query('find', query).limit(limit)
+        if skip_rows is not None:
+            data = data.skip(skip_rows)
+        if limit_rows:
+            data = data.limit(limit_rows)
         return QuerySet((cls.parse_obj(obj) for obj in data))
 
     @classmethod

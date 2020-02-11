@@ -36,6 +36,8 @@ class Benner(MongoModel):
 ## Queries
 ```python
 banner = Banner.find_one() # return a banner model obj
+# skip and limit
+banner_with_skip_and_limit = Banner.find(skip_rows=10, limit_rows=10)
 banner_data = Banner.find_one().data # return a dict
 banners_queryset= Banner.find() # return QuerySet object
 banners_dict = Banner.find().data
