@@ -202,11 +202,11 @@ class MongoModel(DBMixin, BaseModel):
         return r.modified_count
 
     @classmethod
-    def update_one(cls, upsert: bool = False,  **query) -> int:
+    def update_one(cls, upsert: bool = False, **query) -> int:
         return cls._update('update_one', query, upsert=upsert)
 
     @classmethod
-    def update_many(cls,  upsert: bool = False, **query) -> int:
+    def update_many(cls, upsert: bool = False, **query) -> int:
         return cls._update('update_many', query, upsert=upsert)
 
     @classmethod
@@ -274,6 +274,28 @@ class MongoModel(DBMixin, BaseModel):
             filter_,
             {'$set': set_values},
             return_document=return_document,
+            projection=projection,
+            upsert=upsert,
+            sort=sort,
+        )
+        if projection:
+            return {field: value for field, value in data.items() if projection.get(field)}
+        return cls.parse_obj(data)
+
+    @classmethod
+    def find_and_replace(cls, replacement: Union[dict, Any],
+                         projection: Optional[dict] = None, sort: Optional[dict] = None,
+                         upsert: bool = False, **query) -> Any:
+        if isinstance(replacement, BaseModel):
+            replacement = replacement.data
+        query = cls.__validate_query_data(query)
+        if sort is not None:
+            sort = [(key, value) for key, value in sort.items()]
+        data = cls.__query(
+            'find_one_and_replace',
+            query,
+            replacement,
+            return_document=ReturnDocument.AFTER,
             projection=projection,
             upsert=upsert,
             sort=sort,
