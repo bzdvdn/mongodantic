@@ -1,5 +1,6 @@
 from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Optional
 from pymongo.collection import Collection
+from pymongo import ReturnDocument
 from pymongo.errors import BulkWriteError, NetworkTimeout
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
@@ -195,18 +196,18 @@ class MongoModel(DBMixin, BaseModel):
         return query(raw_query)
 
     @classmethod
-    def _update(cls, method: str, query: Dict) -> int:
+    def _update(cls, method: str, query: Dict, upsert: bool = True) -> int:
         query, set_values = cls._ensure_update_data(**query)
-        r = cls.__query(method, query, {'$set': set_values})
+        r = cls.__query(method, query, {'$set': set_values}, upsert=upsert)
         return r.modified_count
 
     @classmethod
-    def update_one(cls, **query) -> int:
-        return cls._update('update_one', query)
+    def update_one(cls, upsert: bool = False,  **query) -> int:
+        return cls._update('update_one', query, upsert=upsert)
 
     @classmethod
-    def update_many(cls, **query) -> int:
-        return cls._update('update_many', query)
+    def update_many(cls,  upsert: bool = False, **query) -> int:
+        return cls._update('update_many', query, upsert=upsert)
 
     @classmethod
     def _aggregate(cls, operation: str, agg_field: str, **query) -> int:
@@ -260,6 +261,26 @@ class MongoModel(DBMixin, BaseModel):
     @property
     def data(self) -> Dict:
         return self.dict()
+
+    @classmethod
+    def find_one_and_update(cls, projection: Optional[dict] = None, sort: Optional[dict] = None,
+                            upsert: bool = False, **query) -> Any:
+        filter_, set_values = cls._ensure_update_data(**query)
+        return_document = ReturnDocument.AFTER
+        if sort is not None:
+            sort = [(key, value) for key, value in sort.items()]
+        data = cls.__query(
+            'find_one_and_update',
+            filter_,
+            {'$set': set_values},
+            return_document=return_document,
+            projection=projection,
+            upsert=upsert,
+            sort=sort,
+        )
+        if projection:
+            return {field: value for field, value in data.items() if projection.get(field)}
+        return cls.parse_obj(data)
 
     def save(self) -> Any:
         if self._id is not None:
