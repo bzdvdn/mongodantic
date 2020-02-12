@@ -120,6 +120,6 @@ Stats.aggregate_max(date='2020-01-20', agg_field='shows')
 
 # sessions
 from mongodantic.context_manager import SessionContextManager
-with SessionContextManager(Test) as session:
+with SessionContextManager(Banner) as session:
     Banner.find(skip_rows=1, limit_rows=1, session=session).data
 ```
