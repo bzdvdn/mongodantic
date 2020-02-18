@@ -10,6 +10,10 @@ db_name = '<name of database>'
 init_db_connection_params(connection_str, db_name, max_pool_size=100)
 # if u use ssl
 init_db_connection_params(connection_str, db_name, max_pool_size=100, ssl=True, ssl_cert_path='<path to cert>')
+# extra params
+server_selection_timeout_ms = 50000 # pymongo serverSelectionTimeoutMS
+connect_timeout_ms = 50000 # pymongo connectTimeoutMS
+socket_timeout_ms = 50000 # pymongo socketTimeoutMS
 ```
 
 ## Declare models
