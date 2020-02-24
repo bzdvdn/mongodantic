@@ -137,6 +137,13 @@ class MongoModel(DBMixin, BaseModel):
         return QuerySet((cls.parse_obj(obj) for obj in data))
 
     @classmethod
+    def find_with_count(cls, skip_rows: Optional[int] = None, limit_rows: Optional[int] = None,
+                        session: Optional[ClientSession] = None, **query) -> tuple:
+        count = cls.count(**query, session=session)
+        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, **query)
+        return count, results
+
+    @classmethod
     def insert_one(cls, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = cls.parse_obj(query)
         data = cls.__query('insert_one', obj.data, session=session)
@@ -204,7 +211,7 @@ class MongoModel(DBMixin, BaseModel):
         return query(raw_query, session=session)
 
     @classmethod
-    def _update(cls, method: str, query: Dict, upsert: bool = True,  session: Optional[ClientSession] = None) -> int:
+    def _update(cls, method: str, query: Dict, upsert: bool = True, session: Optional[ClientSession] = None) -> int:
         query, set_values = cls._ensure_update_data(**query)
         r = cls.__query(method, query, {'$set': set_values}, upsert=upsert, session=session)
         return r.modified_count
@@ -214,7 +221,7 @@ class MongoModel(DBMixin, BaseModel):
         return cls._update('update_one', query, upsert=upsert, session=session)
 
     @classmethod
-    def update_many(cls, upsert: bool = False,  session: Optional[ClientSession] = None, **query) -> int:
+    def update_many(cls, upsert: bool = False, session: Optional[ClientSession] = None, **query) -> int:
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod

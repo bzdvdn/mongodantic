@@ -48,6 +48,7 @@ banners_dict = Banner.find().data
 list_of_banners = Banner.find().list
 banners_generator = Banner.find().generator # generator of Banner objects
 banners_generator_of_dicts = Banner.find().data_generator # generator of Banner objects
+count, banners = Banner.find_with_count() # return tuple(int, QuerySet)
 
 # count
 count = Banner.count(name='test')
