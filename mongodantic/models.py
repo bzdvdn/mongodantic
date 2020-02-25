@@ -87,20 +87,20 @@ class MongoModel(DBMixin, BaseModel):
             return cls.__query(method_name, query_params, set_values, **kwargs)
 
     @classmethod
-    def check_indexes(cls) -> Dict:
+    def check_indexes(cls) -> List:
         index_list = list(cls.__query('list_indexes', {}))
-        return_dict = {}
+        return_list = []
         for index in index_list:
             d = dict(index)
             _dict = {'name': d['name'], 'key': dict(d['key'])}
-            return_dict.update(_dict)
-        return return_dict
+            return_list.append(_dict)
+        return return_list
 
     @classmethod
     def add_index(cls, index_name: str, index_type: int, background: bool = True, unique: bool = False,
                   sparse: bool = False) -> str:
-        indexes = cls.check_indexes()
-        if index_name in indexes:
+        indexes = [index['name'] for index in cls.check_indexes()]
+        if f'{index_name}_{index_type}' in indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
             cls.__query('create_index', [(index_name, index_type)],
