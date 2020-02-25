@@ -44,7 +44,7 @@ class MongoModel(DBMixin, BaseModel):
         return obj
 
     @classmethod
-    def __validate_query_data(cls, query: Dict, value_validation: bool = False) -> Dict:
+    def __validate_query_data(cls, query: Dict) -> Dict:
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
@@ -55,7 +55,9 @@ class MongoModel(DBMixin, BaseModel):
                 value = _dict[field]
             elif field == '_id':
                 value = ObjectId(value)
-            data[field] = value if not value_validation else cls.__validate_value(field, value)
+            else:
+                value = cls.__validate_value(field, value)
+            data[field] = value
         return data
 
     @classmethod
@@ -179,7 +181,7 @@ class MongoModel(DBMixin, BaseModel):
             extra_fields = name.split("__")
             if len(extra_fields) == 2:
                 if extra_fields[1] == "set":
-                    _dict = cls.__validate_query_data({extra_fields[0]: value}, value_validation=True)
+                    _dict = cls.__validate_query_data({extra_fields[0]: value})
                     set_values.update(_dict)
             else:
                 _dict = cls.__validate_query_data({name: value})
