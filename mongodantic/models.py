@@ -300,7 +300,7 @@ class MongoModel(DBMixin, BaseModel):
             session=session,
         )
         if projection:
-            return {field: value for field, value in data.items() if projection.get(field)}
+            return {field: value for field, value in data.items() if field in projection}
         return cls.parse_obj(data)
 
     @classmethod
