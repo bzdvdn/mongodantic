@@ -71,6 +71,7 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
                 session: Optional[ClientSession] = None, **kwargs) -> Any:
+        inner_query_params = query_params
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
         collection = cls._get_collection()
@@ -86,7 +87,7 @@ class MongoModel(DBMixin, BaseModel):
             return method(*query)
         except NetworkTimeout:
             cls._reconnect()
-            return cls.__query(method_name=method_name, query_params=query_params,
+            return cls.__query(method_name=method_name, query_params=inner_query_params,
                                set_values=set_values, session=session, **kwargs)
 
     @classmethod
