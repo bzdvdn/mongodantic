@@ -86,7 +86,8 @@ class MongoModel(DBMixin, BaseModel):
             return method(*query)
         except NetworkTimeout:
             cls._reconnect()
-            return cls.__query(method_name, query_params, set_values, **kwargs)
+            return cls.__query(method_name=method_name, query_params=query_params,
+                               set_values=set_values, session=session, **kwargs)
 
     @classmethod
     def check_indexes(cls) -> List:
