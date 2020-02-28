@@ -65,7 +65,7 @@ class MongoModel(DBMixin, BaseModel):
         field = cls.__fields__[field_name]
         value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
         if error_:
-            raise ValidationError([error_], type(cls))
+            raise ValidationError([error_], type(value))
         return value
 
     @classmethod
