@@ -22,3 +22,7 @@ class ValidationError(BaseMongodanticException):
 
 class MongoIndexError(BaseMongodanticException):
     pass
+
+
+class MongoConnectionError(BaseMongodanticException):
+    pass

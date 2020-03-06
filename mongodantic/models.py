@@ -2,14 +2,15 @@ from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Option
 from pymongo.collection import Collection
 from pymongo import ReturnDocument
 from pymongo.client_session import ClientSession
-from pymongo.errors import BulkWriteError, NetworkTimeout
+from pymongo.errors import BulkWriteError, NetworkTimeout, AutoReconnect, ConnectionFailure, WriteConcernError, \
+    ServerSelectionTimeoutError
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
 from pydantic import BaseModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
-from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError
+from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError, MongoConnectionError
 from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator
 from .queryset import QuerySet
 from .context_manager import SessionContextManager
@@ -70,7 +71,7 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
-                session: Optional[ClientSession] = None, **kwargs) -> Any:
+                session: Optional[ClientSession] = None, counter: int = 1, **kwargs) -> Any:
         inner_query_params = query_params
         if isinstance(query_params, dict):
             query_params = cls.__validate_query_data(query_params)
@@ -85,10 +86,14 @@ class MongoModel(DBMixin, BaseModel):
             if kwargs:
                 return method(*query, **kwargs)
             return method(*query)
-        except NetworkTimeout:
+        except (NetworkTimeout, AutoReconnect, ConnectionFailure, WriteConcernError,
+                ServerSelectionTimeoutError) as description:
             cls._reconnect()
+            if counter >= 5:
+                raise MongoConnectionError(description)
+            counter += 1
             return cls.__query(method_name=method_name, query_params=inner_query_params,
-                               set_values=set_values, session=session, **kwargs)
+                               set_values=set_values, session=session, counter=counter, **kwargs)
 
     @classmethod
     def check_indexes(cls) -> List:
