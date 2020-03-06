@@ -39,8 +39,14 @@ class ExtraQueryMapper(object):
     def startswith(self, value: str):
         return {"$regex": f"^{value}"}
 
+    def not_startswith(self, value: str):
+        return {"not": {"$regex": f"^{value}"}}
+
     def endswith(self, value: str):
         return {"$regex": f"{value}$"}
+
+    def not_endswith(self, value: str):
+        return {"not": {"$regex": f"{value}$"}}
 
     def nin(self, list_values: List):
         if not isinstance(list_values, list):

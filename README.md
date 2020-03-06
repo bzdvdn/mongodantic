@@ -77,6 +77,10 @@ Banner.find(name__regex='^test') # regex query
 Banner.find(name__startswith='t') # startswith query
 
 Banner.find(name__endswith='t') # endswith query
+Banner.find(name__not_startswith='t') # not startswith query
+
+Banner.find(name__not_endswith='t') # not endswith query
+
 
 Banner.find(name__nin=[1, 2]) # not in list
 
