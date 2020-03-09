@@ -6,15 +6,8 @@ from .exceptions import DuplicateQueryParamError
 __all__ = ("Q",)
 
 
-def parse_query(query: dict) -> dict:
-    for field, value in query.items():
-        field, *extra_params = field.split("__")
-        _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
-        if _dict:
-            query = _dict
-        else:
-            query = {field: value}
-    return query
+def parse_query(model: any, query: dict) -> dict:
+    return model._validate_query_data(query)
 
 
 class QueryNodeVisitor(object):
@@ -38,7 +31,6 @@ class SimplificationVisitor(QueryNodeVisitor):
         self.model = model
 
     def prepare_combination(self, combination):
-        print(combination)
         if combination.operation == combination.AND:
             # The simplification only applies to 'simple' queries
             if all(isinstance(node, Query) for node in combination.children):
@@ -53,7 +45,7 @@ class SimplificationVisitor(QueryNodeVisitor):
         """
         combined_query = []
         for query in queries:
-            query = parse_query(query)
+            query = parse_query(self.model, query)
             combined_query.append(copy.deepcopy(query))
         return combined_query
 
@@ -63,8 +55,8 @@ class QueryCompilerVisitor(QueryNodeVisitor):
     dictionary.
     """
 
-    def __init__(self, document):
-        self.document = document
+    def __init__(self, model):
+        self.model = model
 
     def prepare_combination(self, combination):
         operator = "$and"
@@ -73,7 +65,7 @@ class QueryCompilerVisitor(QueryNodeVisitor):
         return {operator: combination.children}
 
     def visit_query(self, query):
-        query = parse_query(query.query)
+        query = parse_query(self.model, query.query)
         return query
 
 
@@ -83,10 +75,10 @@ class QueryNode(object):
     AND = 0
     OR = 1
 
-    def to_query(self, document):
-        query = self.accept(SimplificationVisitor())
+    def to_query(self, model):
+        query = self.accept(SimplificationVisitor(model))
         if not isinstance(query, dict):
-            query = query.accept(QueryCompilerVisitor(document))
+            query = query.accept(QueryCompilerVisitor(model))
         return query
 
     def accept(self, visitor):
