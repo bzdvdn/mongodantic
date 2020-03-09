@@ -45,7 +45,7 @@ class MongoModel(DBMixin, BaseModel):
         return obj
 
     @classmethod
-    def __validate_query_data(cls, query: Dict) -> Dict:
+    def _validate_query_data(cls, query: Dict) -> Dict:
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
@@ -74,7 +74,7 @@ class MongoModel(DBMixin, BaseModel):
                 session: Optional[ClientSession] = None, counter: int = 1, **kwargs) -> Any:
         inner_query_params = query_params
         if isinstance(query_params, dict):
-            query_params = cls.__validate_query_data(query_params)
+            query_params = cls._validate_query_data(query_params)
         collection = cls._get_collection()
         method = getattr(collection, method_name)
         query = (query_params,)
@@ -188,10 +188,10 @@ class MongoModel(DBMixin, BaseModel):
             extra_fields = name.split("__")
             if len(extra_fields) == 2:
                 if extra_fields[1] == "set":
-                    _dict = cls.__validate_query_data({extra_fields[0]: value})
+                    _dict = cls._validate_query_data({extra_fields[0]: value})
                     set_values.update(_dict)
             else:
-                _dict = cls.__validate_query_data({name: value})
+                _dict = cls._validate_query_data({name: value})
                 queries.update(_dict)
         return queries, set_values
 
@@ -203,8 +203,8 @@ class MongoModel(DBMixin, BaseModel):
             raise AttributeError('not filter parameters')
         if not replacement:
             raise AttributeError('not replacement parameters')
-        filter_query = cls.__validate_query_data(filter_query)
-        replacement = cls.__validate_query_data(replacement)
+        filter_query = cls._validate_query_data(filter_query)
+        replacement = cls._validate_query_data(replacement)
         return cls.__query('replace_one', filter_query, replacement=replacement, upsert=upsert, session=session)
 
     @classmethod
@@ -212,9 +212,9 @@ class MongoModel(DBMixin, BaseModel):
                   session: Optional[ClientSession] = None) -> Any:
         if 'insert' in method_name or 'replace' in method_name or 'update' in method_name:
             if isinstance(raw_query, list):
-                raw_query = list(map(cls.__validate_query_data, raw_query))
+                raw_query = list(map(cls._validate_query_data, raw_query))
             else:
-                raw_query = cls.__validate_query_data(raw_query)
+                raw_query = cls._validate_query_data(raw_query)
         collection = cls._get_collection()
         query = getattr(collection, method_name)
         return query(raw_query, session=session)
@@ -235,7 +235,7 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def _aggregate(cls, operation: str, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
-        query = cls.__validate_query_data(query)
+        query = cls._validate_query_data(query)
         data = [
             {"$match": query},
             {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
@@ -317,7 +317,7 @@ class MongoModel(DBMixin, BaseModel):
                          **query) -> Any:
         if isinstance(replacement, BaseModel):
             replacement = replacement.data
-        query = cls.__validate_query_data(query)
+        query = cls._validate_query_data(query)
         if sort is not None:
             sort = [(key, value) for key, value in sort.items()]
         data = cls.__query(

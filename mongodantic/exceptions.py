@@ -26,3 +26,7 @@ class MongoIndexError(BaseMongodanticException):
 
 class MongoConnectionError(BaseMongodanticException):
     pass
+
+
+class DuplicateQueryParamError(BaseMongodanticException):
+    pass

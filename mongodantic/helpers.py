@@ -113,3 +113,5 @@ def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
                     query.update({field: value})
             data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
     return data
+
+
