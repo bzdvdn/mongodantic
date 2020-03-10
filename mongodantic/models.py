@@ -10,10 +10,11 @@ from pydantic import BaseModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
-from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError, MongoConnectionError
+from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError, MongoConnectionError, \
+    InvalidArgsParams
 from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator
 from .queryset import QuerySet
-from .context_manager import SessionContextManager
+from .logical import LogicalCombination, Query
 
 SetStr = Set[str]
 
@@ -70,10 +71,16 @@ class MongoModel(DBMixin, BaseModel):
         return value
 
     @classmethod
+    def __check_query_args(cls, logical: Union[Query, LogicalCombination, None] = None) -> Dict:
+        if not isinstance(logical, (LogicalCombination, Query)):
+            raise InvalidArgsParams()
+        return logical.to_query(cls)
+
+    @classmethod
     def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
-                session: Optional[ClientSession] = None, counter: int = 1, **kwargs) -> Any:
+                session: Optional[ClientSession] = None, counter: int = 1, logical: bool = False, **kwargs) -> Any:
         inner_query_params = query_params
-        if isinstance(query_params, dict):
+        if isinstance(query_params, dict) and not logical:
             query_params = cls._validate_query_data(query_params)
         collection = cls._get_collection()
         method = getattr(collection, method_name)
@@ -124,21 +131,30 @@ class MongoModel(DBMixin, BaseModel):
         return f'{index_name} dropped.'
 
     @classmethod
-    def count(cls, session: Optional[ClientSession] = None, **query) -> int:
-        return cls.__query('count', query, session=session)
+    def count(cls, logical: Union[Query, LogicalCombination, None] = None,
+              session: Optional[ClientSession] = None, **query) -> int:
+        if logical:
+            query = cls.__check_query_args(logical)
+        return cls.__query('count', query, session=session, logical=bool(logical))
 
     @classmethod
-    def find_one(cls, session: Optional[ClientSession] = None, **query) -> Any:
-        data = cls.__query('find_one', query, session=session)
+    def find_one(cls, logical: Union[Query, LogicalCombination, None] = None,
+                 session: Optional[ClientSession] = None, **query) -> Any:
+        if logical:
+            query = cls.__check_query_args(logical)
+        data = cls.__query('find_one', query, session=session, logical=bool(logical))
         if data:
             obj = cls.parse_obj(data)
             return obj
         return None
 
     @classmethod
-    def find(cls, skip_rows: Optional[int] = None, limit_rows: Optional[int] = None,
+    def find(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
+             limit_rows: Optional[int] = None,
              session: Optional[ClientSession] = None, **query) -> QuerySet:
-        data = cls.__query('find', query, session=session)
+        if logical:
+            query = cls.__check_query_args(logical)
+        data = cls.__query('find', query, session=session, logical=bool(logical))
         if skip_rows is not None:
             data = data.skip(skip_rows)
         if limit_rows:
@@ -146,10 +162,13 @@ class MongoModel(DBMixin, BaseModel):
         return QuerySet((cls.parse_obj(obj) for obj in data))
 
     @classmethod
-    def find_with_count(cls, skip_rows: Optional[int] = None, limit_rows: Optional[int] = None,
-                        session: Optional[ClientSession] = None, **query) -> tuple:
-        count = cls.count(**query, session=session)
-        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, **query)
+    def find_with_count(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
+                        limit_rows: Optional[int] = None,
+                        session: Optional[ClientSession] = None, *args, **query) -> tuple:
+        if logical:
+            query = cls.__check_query_args(logical)
+        count = cls.count(**query, session=session, logical=bool(logical))
+        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=bool(logical), **query)
         return count, results
 
     @classmethod
@@ -169,13 +188,19 @@ class MongoModel(DBMixin, BaseModel):
         return len(r.inserted_ids)
 
     @classmethod
-    def delete_one(cls, session: Optional[ClientSession] = None, **query) -> int:
-        r = cls.__query('delete_one', query, session=session)
+    def delete_one(cls, logical: Union[Query, LogicalCombination, None] = None, session: Optional[ClientSession] = None,
+                   **query) -> int:
+        if logical:
+            query = cls.__check_query_args(logical)
+        r = cls.__query('delete_one', query, session=session, logical=bool(logical))
         return r.deleted_count
 
     @classmethod
-    def delete_many(cls, session: Optional[ClientSession] = None, **query) -> int:
-        r = cls.__query('delete_many', query, session=session)
+    def delete_many(cls, logical: Union[Query, LogicalCombination, None] = None,
+                    session: Optional[ClientSession] = None, *args, **query) -> int:
+        if logical:
+            query = cls.__check_query_args(logical)
+        r = cls.__query('delete_many', query, session=session, logical=bool(logical))
         return r.deleted_count
 
     @classmethod

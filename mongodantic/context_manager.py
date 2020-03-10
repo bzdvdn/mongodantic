@@ -1,8 +1,10 @@
 from typing import Any
 from contextlib import ContextDecorator
 
+__all__ = ("SessionManager",)
 
-class SessionContextManager(ContextDecorator):
+
+class SessionManager(ContextDecorator):
     def __init__(self, mongo_model: Any):
         self._mongo_model = mongo_model
         self._session = None

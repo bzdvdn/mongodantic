@@ -128,7 +128,13 @@ Stats.aggregate_min(date='2020-01-20', agg_field='clicks')
 Stats.aggregate_max(date='2020-01-20', agg_field='shows')
 
 # sessions
-from mongodantic.context_manager import SessionContextManager
-with SessionContextManager(Banner) as session:
+from mongodantic.context_manager import SessionManager
+with SessionManager(Banner) as session:
     Banner.find(skip_rows=1, limit_rows=1, session=session).data
+
+
+# logical
+from mongodantic.logical import Query
+data = Banner.find_one(Query(name='test') | Query(name__regex='testerino'))
+
 ```

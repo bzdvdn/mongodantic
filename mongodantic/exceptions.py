@@ -30,3 +30,8 @@ class MongoConnectionError(BaseMongodanticException):
 
 class DuplicateQueryParamError(BaseMongodanticException):
     pass
+
+
+class InvalidArgsParams(BaseMongodanticException):
+    def __str__(self):
+        return 'Arguments must be Query objects'

@@ -3,7 +3,7 @@ import warnings
 from .helpers import ExtraQueryMapper
 from .exceptions import DuplicateQueryParamError
 
-__all__ = ("Q",)
+__all__ = ("Query", "LogicalCombination")
 
 
 def parse_query(model: any, query: dict) -> dict:
