@@ -18,7 +18,7 @@ from .logical import LogicalCombination, Query
 
 SetStr = Set[str]
 
-__all__ = ('MongoModel', 'QuerySet')
+__all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
 class MongoModel(DBMixin, BaseModel):
