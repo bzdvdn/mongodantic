@@ -16,11 +16,11 @@ class DBConnection(object):
         self.ssl = True if int(os.environ.get('MONGODANTIC_SSL', 0)) else False
         self.ssl_cert_path = os.environ.get('MONGODANTIC_SSL_CERT_PATH')
         self.server_selection_timeout_ms = int(os.environ['MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS']) if os.environ.get(
-            'MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS') else 30000
+            'MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS') else 50000
         self.connect_timeout_ms = int(os.environ['MONGODANTIC_CONNECT_TIMEOUT_MS']) if \
-            os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS') else 30000
+            os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS') else 50000
         self.socket_timeout_ms = int(os.environ['MONGODANTIC_SOCKET_TIMEOUT_MS']) if \
-            os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS') else 30000
+            os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS') else 60000
         self._mongo_connection = self.__init_mongo_connection()
         self.database = self._mongo_connection.get_database(self.db_name)
 
@@ -45,3 +45,8 @@ class DBConnection(object):
                 connectTimeoutMS=self.connect_timeout_ms,
                 socketTimeoutMS=self.socket_timeout_ms,
             )
+
+    def _reconnect(self):
+        self._mongo_connection = self.__init_mongo_connection()
+        self.database = self._mongo_connection.get_database(self.db_name)
+        return self

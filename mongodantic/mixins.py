@@ -8,7 +8,6 @@ class DBMixin(object):
 
     @classmethod
     def _reconnect(cls):
-        connection = DBConnection()
-        cls._Meta._connection = connection
-        cls._Meta._database = connection.database
+        cls._Meta._connection = cls._Meta._connection._reconnect()
+        cls._Meta._database = cls._Meta._connection.database
 
