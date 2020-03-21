@@ -1,4 +1,8 @@
 from typing import Generator, List
+from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, \
+    WriteConcernError
+
+from .exceptions import MongoConnectionError
 
 
 class QuerySet(object):
@@ -6,23 +10,32 @@ class QuerySet(object):
         self._data = data
 
     def __iter__(self):
-        return (obj for obj in self._data)
+        try:
+            return (obj for obj in self._data)
+        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
+            raise MongoConnectionError(e)
+
+    def __data_iter(self) -> Generator:
+        try:
+            return (obj.data for obj in self._data)
+        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
+            raise MongoConnectionError(e)
 
     @property
     def data(self) -> List:
-        return [obj.data for obj in self._data]
+        return list(self.__data_iter())
 
     @property
     def generator(self) -> Generator:
-        return (obj for obj in self._data)
+        return self.__iter__()
 
     @property
     def data_generator(self) -> Generator:
-        return (obj.data for obj in self._data)
+        return self.__data_iter()
 
     @property
     def list(self) -> List:
-        return [obj for obj in self._data]
+        return list(self.__iter__())
 
     def first(self) -> any:
         return next(self.__iter__())
