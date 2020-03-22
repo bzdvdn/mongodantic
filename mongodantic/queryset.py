@@ -15,15 +15,9 @@ class QuerySet(object):
         except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
             raise MongoConnectionError(e)
 
-    def __data_iter(self) -> Generator:
-        try:
-            return (obj.data for obj in self._data)
-        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
-            raise MongoConnectionError(e)
-
     @property
     def data(self) -> List:
-        return list(self.__data_iter())
+        return [obj.data for obj in self.__iter__()]
 
     @property
     def generator(self) -> Generator:
@@ -31,7 +25,7 @@ class QuerySet(object):
 
     @property
     def data_generator(self) -> Generator:
-        return self.__data_iter()
+        return (obj.data for obj in self.__iter__())
 
     @property
     def list(self) -> List:
