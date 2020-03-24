@@ -159,7 +159,8 @@ class MongoModel(DBMixin, BaseModel):
             data = data.skip(skip_rows)
         if limit_rows:
             data = data.limit(limit_rows)
-        return QuerySet((cls.parse_obj(obj) for obj in data))
+
+        return QuerySet(cls, data)
 
     @classmethod
     def find_with_count(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,

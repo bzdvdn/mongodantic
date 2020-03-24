@@ -1,4 +1,5 @@
 from typing import Generator, List
+from pydantic import BaseModel
 from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, \
     WriteConcernError
 
@@ -6,12 +7,13 @@ from .exceptions import MongoConnectionError
 
 
 class QuerySet(object):
-    def __init__(self, data: Generator):
+    def __init__(self, model: BaseModel, data: Generator):
         self._data = data
+        self._model = model
 
     def __iter__(self):
         try:
-            return (obj for obj in self._data)
+            return (self._model.parse_obj(obj) for obj in self._data)
         except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
             raise MongoConnectionError(e)
 
