@@ -97,9 +97,9 @@ class MongoModel(DBMixin, BaseModel):
                 ServerSelectionTimeoutError) as description:
             cls._reconnect()
             if counter >= 5:
-                raise MongoConnectionError(description)
+                raise MongoConnectionError(str(description))
             counter += 1
-            return cls.__query(method_name=method_name, query_params=inner_query_params,
+            return cls.__query(method_name=method_name, query_params=inner_query_params, logical=logical,
                                set_values=set_values, session=session, counter=counter, **kwargs)
 
     @classmethod
@@ -168,8 +168,8 @@ class MongoModel(DBMixin, BaseModel):
                         session: Optional[ClientSession] = None, *args, **query) -> tuple:
         if logical:
             query = cls.__check_query_args(logical)
-        count = cls.count(**query, session=session, logical=bool(logical))
-        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=bool(logical), **query)
+        count = cls.count(**query, session=session, logical=logical)
+        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=logical, **query)
         return count, results
 
     @classmethod
@@ -371,3 +371,6 @@ class MongoModel(DBMixin, BaseModel):
         object_id = self.insert_one(**data, session=session)
         self._id = object_id.__str__()
         return self
+
+    def _start_session(self) -> ClientSession:
+        return self._Meta._connection._mongo_connection.start_session()

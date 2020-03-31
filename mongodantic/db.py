@@ -25,26 +25,22 @@ class DBConnection(object):
         self.database = self._mongo_connection.get_database(self.db_name)
 
     def __init_mongo_connection(self) -> MongoClient:
+        connection_params = dict(
+            connect=True,
+            serverSelectionTimeoutMS=self.server_selection_timeout_ms,
+            maxPoolSize=self.max_pool_size,
+            connectTimeoutMS=self.connect_timeout_ms,
+            socketTimeoutMS=self.socket_timeout_ms,
+            retryWrites=True,
+            retryReads=True,
+        )
         if self.ssl:
-            return MongoClient(
-                self.connection_string,
-                connect=True,
-                ssl_ca_certs=self.ssl_cert_path,
-                serverSelectionTimeoutMS=self.server_selection_timeout_ms,
-                maxPoolSize=self.max_pool_size,
-                connectTimeoutMS=self.connect_timeout_ms,
-                socketTimeoutMS=self.socket_timeout_ms,
-                ssl_cert_reqs=self.ssl,
-            )
-        else:
-            return MongoClient(
-                self.connection_string,
-                connect=True,
-                serverSelectionTimeoutMS=self.server_selection_timeout_ms,
-                maxPoolSize=self.max_pool_size,
-                connectTimeoutMS=self.connect_timeout_ms,
-                socketTimeoutMS=self.socket_timeout_ms,
-            )
+            connection_params['tlsCAFile'] = self.ssl_cert_path
+            connection_params['tlsAllowInvalidCertificates'] = self.ssl,
+        return MongoClient(
+            self.connection_string,
+            **connection_params
+        )
 
     def _reconnect(self):
         self._mongo_connection = self.__init_mongo_connection()

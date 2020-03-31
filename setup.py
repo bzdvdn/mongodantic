@@ -14,8 +14,8 @@ setup(
     version=__version__,
     packages=find_packages(),
     install_requires=[
-        'pydantic',
-        'pymongo',
+        'pydantic>=1.3,<2',
+        'pymongo>=3.10.1,<3.11',
     ],
     description='Mongo ODM, based on pydantic',
     author='bzdvdn',
