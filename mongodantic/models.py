@@ -139,10 +139,14 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def find_one(cls, logical: Union[Query, LogicalCombination, None] = None,
-                 session: Optional[ClientSession] = None, **query) -> Any:
+                 session: Optional[ClientSession] = None,
+                 sort_fields: Union[tuple, list] = ('_id', ),
+                 sort: int = 1,
+                 **query) -> Any:
         if logical:
             query = cls.__check_query_args(logical)
-        data = cls.__query('find_one', query, session=session, logical=bool(logical))
+        sort_values = [(field, sort) for field in sort_fields]
+        data = cls.__query('find_one', query, session=session, logical=bool(logical), sort=sort_values)
         if data:
             obj = cls.parse_obj(data)
             return obj
@@ -151,7 +155,10 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def find(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
              limit_rows: Optional[int] = None,
-             session: Optional[ClientSession] = None, **query) -> QuerySet:
+             session: Optional[ClientSession] = None,
+             sort_fields: Union[tuple, list] = ('_id', ),
+             sort: int = 1,
+             **query) -> QuerySet:
         if logical:
             query = cls.__check_query_args(logical)
         data = cls.__query('find', query, session=session, logical=bool(logical))
@@ -159,17 +166,24 @@ class MongoModel(DBMixin, BaseModel):
             data = data.skip(skip_rows)
         if limit_rows:
             data = data.limit(limit_rows)
+        if sort not in (1, -1):
+            raise ValueError(f'invalid sort value must be 1 or -1 not {sort}')
+        sort_values = [(field, sort) for field in sort_fields]
 
-        return QuerySet(cls, data)
+        return QuerySet(cls, data.sort(sort_values))
 
     @classmethod
     def find_with_count(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
                         limit_rows: Optional[int] = None,
-                        session: Optional[ClientSession] = None, *args, **query) -> tuple:
+                        session: Optional[ClientSession] = None,
+                        sort_fields: Union[tuple, list] = ('_id',),
+                        sort: int = 1,
+                        **query) -> tuple:
         if logical:
             query = cls.__check_query_args(logical)
         count = cls.count(**query, session=session, logical=logical)
-        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=logical, **query)
+        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=logical,
+                           sort_fields=sort_fields, sort=sort, **query)
         return count, results
 
     @classmethod

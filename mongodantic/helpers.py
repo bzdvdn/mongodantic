@@ -1,7 +1,11 @@
-from typing import List, Any, Dict, Tuple, Union, Optional
+from typing import List, Any, Dict, Tuple, Union, Optional, Callable
 from pydantic.fields import ModelField
 from bson import ObjectId
 from pymongo import UpdateOne
+from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, \
+    WriteConcernError
+
+from .exceptions import MongoConnectionError
 
 
 class ExtraQueryMapper(object):
@@ -115,3 +119,10 @@ def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
     return data
 
 
+def handle_and_convert_connection_errors(func: Callable) -> Any:
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
+            raise MongoConnectionError(str(e))
+    return wrapper
