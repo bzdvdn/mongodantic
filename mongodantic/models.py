@@ -23,9 +23,10 @@ __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
+    __reference__ = {}
 
     def __setattr__(self, key, value):
-        if key != '_id':
+        if key in self.__fields__:
             return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
@@ -39,10 +40,26 @@ class MongoModel(DBMixin, BaseModel):
         return cls._Meta._database.get_collection(cls.set_collection_name())
 
     @classmethod
-    def parse_obj(cls, data: Any) -> Any:
+    def parse_obj(cls, data: Any, reference_aggregation: bool = False) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = str(data['_id'])
+        for field in cls.__reference__:
+            reference_obj = cls.__reference__[field]
+            reference_field_name = field.split('_id')[0]
+            if reference_aggregation:
+                if isinstance(data[reference_field_name], list):
+                    reference_data = [
+                        reference_obj.parse_obj(reference)
+                        for reference in data[reference_field_name]
+                    ]
+                elif isinstance(data[reference_field_name], dict):
+                    reference_data =  reference_obj.parse_obj(data[reference_field_name])
+                else:
+                    reference_data = None
+                setattr(cls, reference_field_name, reference_data)
+            else:
+                setattr(cls, field, data[field])
         return obj
 
     @classmethod
