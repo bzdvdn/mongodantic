@@ -5,18 +5,27 @@ from pydantic import BaseModel
 
 class ObjectIdStr(str):
     """Field for validate string like ObjectId"""
+    type_ = ObjectId
+    required = False
+    default = None
+    validate_always = False
+    alias = ''
+
+    # def __init__(self, *args):
+    #     if kwargs:
+    #         self.alias = args[0]
+    #     super().__init__()
 
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v):
+    def validate(cls, v, ):
         if isinstance(v, ObjectId):
-            return str(v)
+            return v, None
         else:
             try:
-                ObjectId(str(v))
+                return ObjectId(str(v)), None
             except InvalidId:
-                raise ValueError('Not a valid ObjectId')
-            return v
+                return '', ValueError

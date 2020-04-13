@@ -23,7 +23,7 @@ __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
-    __reference__ = {}
+    __reference__ = None
 
     def __setattr__(self, key, value):
         if key in self.__fields__:
@@ -40,26 +40,28 @@ class MongoModel(DBMixin, BaseModel):
         return cls._Meta._database.get_collection(cls.set_collection_name())
 
     @classmethod
-    def parse_obj(cls, data: Any, reference_aggregation: bool = False) -> Any:
+    def parse_obj(cls, data: Any, reference_model: Optional[ModelMetaclass] = None,
+                  reference_foreign_field: Optional[str] = None) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
-            obj._id = str(data['_id'])
-        for field in cls.__reference__:
-            reference_obj = cls.__reference__[field]
-            reference_field_name = field.split('_id')[0]
-            if reference_aggregation:
-                if isinstance(data[reference_field_name], list):
-                    reference_data = [
-                        reference_obj.parse_obj(reference)
-                        for reference in data[reference_field_name]
-                    ]
-                elif isinstance(data[reference_field_name], dict):
-                    reference_data =  reference_obj.parse_obj(data[reference_field_name])
-                else:
-                    reference_data = None
-                setattr(cls, reference_field_name, reference_data)
-            else:
-                setattr(cls, field, data[field])
+            obj._id = data['_id']
+        if reference_model:
+            obj = cls.__set_reference_fields(obj, data, reference_model, reference_foreign_field)
+        return obj
+
+    @classmethod
+    def __set_reference_fields(cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass,
+                               reference_foreign_field: Optional[str] = None) -> ModelMetaclass:
+        ref_field = f'{ref.__name__.lower()}_id' if not reference_foreign_field else reference_foreign_field
+        if ref.__name__.lower() in data:
+            ref_obj = ref.parse_obj(data[ref.__name__.lower()])
+            setattr(obj, f'{ref.__name__.lower()}', ref_obj)
+            ref_field_value = ObjectIdStr(ref_obj._id)
+        else:
+            ref_field = f'{ref.__name__.lower()}_id'
+            ref_field_value = data[ref_field]._id if isinstance(data[ref_field], ModelMetaclass) else data[ref_field]
+            obj.__fields__[ref_field] = ObjectIdStr(ref_field_value)
+        setattr(obj, ref_field, ref_field_value)
         return obj
 
     @classmethod
@@ -82,7 +84,10 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def __validate_value(cls, field_name: str, value: Any) -> Any:
         field = cls.__fields__[field_name]
-        value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
+        if isinstance(field, ObjectIdStr):
+            value, error_ = field.validate(value)
+        else:
+            value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
         if error_:
             raise ValidationError([error_], type(value))
         return value
@@ -157,7 +162,7 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def find_one(cls, logical: Union[Query, LogicalCombination, None] = None,
                  session: Optional[ClientSession] = None,
-                 sort_fields: Union[tuple, list] = ('_id', ),
+                 sort_fields: Union[tuple, list] = ('_id',),
                  sort: int = 1,
                  **query) -> Any:
         if logical:
@@ -173,7 +178,7 @@ class MongoModel(DBMixin, BaseModel):
     def find(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
              limit_rows: Optional[int] = None,
              session: Optional[ClientSession] = None,
-             sort_fields: Union[tuple, list] = ('_id', ),
+             sort_fields: Union[tuple, list] = ('_id',),
              sort: int = 1,
              **query) -> QuerySet:
         if logical:
@@ -291,7 +296,8 @@ class MongoModel(DBMixin, BaseModel):
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod
-    def _aggregate(cls, operation: str, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
+    def _aggregate_math_operation(cls, operation: str, agg_field: str, session: Optional[ClientSession] = None,
+                                  **query) -> Union[int, QuerySet]:
         query = cls._validate_query_data(query)
         data = [
             {"$match": query},
@@ -301,6 +307,46 @@ class MongoModel(DBMixin, BaseModel):
             return cls.__query("aggregate", data, session=session).next()["total"]
         except StopIteration:
             return 0
+
+    @classmethod
+    def aggregate_lookup(cls, local_field: str, from_collection: ModelMetaclass,
+                         foreign_field: Optional[str] = None,
+                         as_: Optional[str] = None,
+                         logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
+                         limit_rows: Optional[int] = None,
+                         session: Optional[ClientSession] = None,
+                         sort_fields: Union[tuple, list] = ('_id',),
+                         sort: int = 1,
+                         **query) -> QuerySet:
+        if logical:
+            query = cls.__check_query_args(logical)
+
+        lookup = {
+            "$lookup": {
+                "localField": local_field,
+                "from": from_collection.__name__.lower(),
+                "foreignField": foreign_field if foreign_field else "_id",
+                "as": as_ if as_ else from_collection.__name__.lower()
+            }
+        }
+        project_param = {f: 1 for f in cls.__fields__}
+        project_param['_id'] = 1
+        project_param.update(
+            {f'{lookup["$lookup"]["as"]}.{f}': 1 for f in ['_id'] + list(from_collection.__fields__.keys())})
+        query_params = [
+            {'$match': query},
+            lookup,
+            {"$unwind": f'${lookup["$lookup"]["as"]}'},
+            {'$project': project_param},
+            {'$sort': {sf: sort for sf in sort_fields}}
+        ]
+        if limit_rows:
+            query_params.append({'$limit': limit_rows})
+        print(query_params)
+        data = cls.__query("aggregate", query_params, session=session, logical=bool(logical))
+        if skip_rows:
+            data = data.skip(skip_rows)
+        return QuerySet(cls, data, reference_model=from_collection, reference_foreign_field=foreign_field)
 
     @classmethod
     def _bulk_operation(cls, models: List, updated_fields: Optional[List] = None,
@@ -332,15 +378,15 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def aggregate_sum(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
-        return cls._aggregate('sum', agg_field, session=session, **query)
+        return cls._aggregate_math_operation('sum', agg_field, session=session, **query)
 
     @classmethod
     def aggregate_max(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
-        return cls._aggregate('max', agg_field, session=session, **query)
+        return cls._aggregate_math_operation('max', agg_field, session=session, **query)
 
     @classmethod
     def aggregate_min(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
-        return cls._aggregate('min', agg_field, session=session, **query)
+        return cls._aggregate_math_operation('min', agg_field, session=session, **query)
 
     @property
     def data(self) -> Dict:
