@@ -1,5 +1,5 @@
 from typing import List, Any, Dict, Tuple, Union, Optional, Callable
-from pydantic.fields import ModelField
+from pydantic.main import ModelMetaclass
 from bson import ObjectId
 from pymongo import UpdateOne
 from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, \
@@ -126,3 +126,11 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
         except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
             raise MongoConnectionError(str(e))
     return wrapper
+
+
+def generate_lookup_project_params(main_model: ModelMetaclass, reference_model: ModelMetaclass, as_: str) -> Dict:
+    project_param = {f: 1 for f in main_model.__fields__}
+    project_param['_id'] = 1
+    project_param.update(
+        {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())})
+    return project_param

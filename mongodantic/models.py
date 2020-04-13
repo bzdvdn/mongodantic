@@ -12,7 +12,7 @@ from .mixins import DBMixin
 from .types import ObjectIdStr
 from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError, MongoConnectionError, \
     InvalidArgsParams
-from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator
+from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator, generate_lookup_project_params
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 
@@ -40,28 +40,22 @@ class MongoModel(DBMixin, BaseModel):
         return cls._Meta._database.get_collection(cls.set_collection_name())
 
     @classmethod
-    def parse_obj(cls, data: Any, reference_model: Optional[ModelMetaclass] = None,
-                  reference_foreign_field: Optional[str] = None) -> Any:
+    def parse_obj(cls, data: Any, reference_model: Optional[ModelMetaclass] = None) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = data['_id']
         if reference_model:
-            obj = cls.__set_reference_fields(obj, data, reference_model, reference_foreign_field)
+            obj = cls.__set_reference_fields(obj, data, reference_model)
         return obj
 
     @classmethod
-    def __set_reference_fields(cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass,
-                               reference_foreign_field: Optional[str] = None) -> ModelMetaclass:
-        ref_field = f'{ref.__name__.lower()}_id' if not reference_foreign_field else reference_foreign_field
-        if ref.__name__.lower() in data:
-            ref_obj = ref.parse_obj(data[ref.__name__.lower()])
-            setattr(obj, f'{ref.__name__.lower()}', ref_obj)
-            ref_field_value = ObjectIdStr(ref_obj._id)
+    def __set_reference_fields(cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass) -> ModelMetaclass:
+        data = data[ref.__name__.lower()]
+        if isinstance(data, dict):
+            ref_obj = ref.parse_obj(data)
         else:
-            ref_field = f'{ref.__name__.lower()}_id'
-            ref_field_value = data[ref_field]._id if isinstance(data[ref_field], ModelMetaclass) else data[ref_field]
-            obj.__fields__[ref_field] = ObjectIdStr(ref_field_value)
-        setattr(obj, ref_field, ref_field_value)
+            ref_obj = [ref.parse_obj(d) for d in data]
+        setattr(obj, f'{ref.__name__.lower()}', ref_obj)
         return obj
 
     @classmethod
@@ -317,10 +311,10 @@ class MongoModel(DBMixin, BaseModel):
                          session: Optional[ClientSession] = None,
                          sort_fields: Union[tuple, list] = ('_id',),
                          sort: int = 1,
+                         with_unwing: bool = True,
                          **query) -> QuerySet:
         if logical:
             query = cls.__check_query_args(logical)
-
         lookup = {
             "$lookup": {
                 "localField": local_field,
@@ -329,24 +323,21 @@ class MongoModel(DBMixin, BaseModel):
                 "as": as_ if as_ else from_collection.__name__.lower()
             }
         }
-        project_param = {f: 1 for f in cls.__fields__}
-        project_param['_id'] = 1
-        project_param.update(
-            {f'{lookup["$lookup"]["as"]}.{f}': 1 for f in ['_id'] + list(from_collection.__fields__.keys())})
+        project_param = generate_lookup_project_params(cls, from_collection, lookup["$lookup"]["as"])
         query_params = [
             {'$match': query},
             lookup,
-            {"$unwind": f'${lookup["$lookup"]["as"]}'},
             {'$project': project_param},
             {'$sort': {sf: sort for sf in sort_fields}}
         ]
+        if with_unwing:
+            query_params.append({"$unwind": f'${lookup["$lookup"]["as"]}'})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
-        print(query_params)
         data = cls.__query("aggregate", query_params, session=session, logical=bool(logical))
         if skip_rows:
             data = data.skip(skip_rows)
-        return QuerySet(cls, data, reference_model=from_collection, reference_foreign_field=foreign_field)
+        return QuerySet(cls, data, reference_model=from_collection)
 
     @classmethod
     def _bulk_operation(cls, models: List, updated_fields: Optional[List] = None,

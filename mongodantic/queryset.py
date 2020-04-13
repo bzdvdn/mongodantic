@@ -6,17 +6,15 @@ from .helpers import handle_and_convert_connection_errors
 
 
 class QuerySet(object):
-    def __init__(self, model: ModelMetaclass, data: Generator, reference_model: Optional[ModelMetaclass] = None,
-                 reference_foreign_field: Optional[str] = None):
+    def __init__(self, model: ModelMetaclass, data: Generator, reference_model: Optional[ModelMetaclass] = None):
         self._data = data
         self._model = model
         self._reference_model = reference_model
-        self._reference_foreign_field = reference_foreign_field
 
     @handle_and_convert_connection_errors
     def __iter__(self):
         for obj in self._data:
-            yield self._model.parse_obj(obj, self._reference_model, self._reference_foreign_field)
+            yield self._model.parse_obj(obj, self._reference_model)
 
     @property
     def data(self) -> List:
