@@ -36,7 +36,7 @@ class DBConnection(object):
         )
         if self.ssl:
             connection_params['tlsCAFile'] = self.ssl_cert_path
-            connection_params['tlsAllowInvalidCertificates'] = self.ssl,
+            connection_params['tlsAllowInvalidCertificates'] = self.ssl
         return MongoClient(
             self.connection_string,
             **connection_params
