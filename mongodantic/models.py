@@ -311,10 +311,12 @@ class MongoModel(DBMixin, BaseModel):
                          session: Optional[ClientSession] = None,
                          sort_fields: Union[tuple, list] = ('_id',),
                          sort: int = 1,
-                         with_unwing: bool = True,
+                         with_unwing: bool = False,
                          **query) -> QuerySet:
         if logical:
             query = cls.__check_query_args(logical)
+        else:
+            query = cls._validate_query_data(query)
         lookup = {
             "$lookup": {
                 "localField": local_field,
