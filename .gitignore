@@ -113,4 +113,8 @@ venv.bak/
 .idea
 ./idea
 
+.vscode
+./vscode
+vscode
+
 mongodantic/local_tests.py
