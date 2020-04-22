@@ -15,12 +15,9 @@ class DBConnection(object):
         self.max_pool_size = int(os.environ.get('MONGODANTIC_POOL_SIZE', 100))
         self.ssl = True if int(os.environ.get('MONGODANTIC_SSL', 0)) else False
         self.ssl_cert_path = os.environ.get('MONGODANTIC_SSL_CERT_PATH')
-        self.server_selection_timeout_ms = int(os.environ['MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS']) if os.environ.get(
-            'MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS') else 50000
-        self.connect_timeout_ms = int(os.environ['MONGODANTIC_CONNECT_TIMEOUT_MS']) if \
-            os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS') else 50000
-        self.socket_timeout_ms = int(os.environ['MONGODANTIC_SOCKET_TIMEOUT_MS']) if \
-            os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS') else 60000
+        self.server_selection_timeout_ms = int(os.environ.get('MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS', 50000))
+        self.connect_timeout_ms = int(os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS', 50000))
+        self.socket_timeout_ms = int(os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS', 60000))
         self._mongo_connection = self.__init_mongo_connection()
         self.database = self._mongo_connection.get_database(self.db_name)
 

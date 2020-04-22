@@ -1,6 +1,6 @@
 # mongodantic
 
-## Settings
+##ettings
 in your main file application
 ```python
 from mongodantic import init_db_connection_params
@@ -115,7 +115,7 @@ Banner.bulk_update(banners, updated_fields=['banner_id'])
 banners = [Banner(banner_id=23, name='new', utms={}), Banner(banner_id=1, name='test', utms={})]
 Banner.bulk_update_or_create(banners, query_fields=['banner_id'])
 
-# aggregate
+# aggregate with sum, min, max
 class Stats(MongoModel):
     id: int
     cost: float

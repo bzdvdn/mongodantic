@@ -16,14 +16,11 @@ from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator, ge
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 
-SetStr = Set[str]
-
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
 class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
-    __reference__ = None
 
     def __setattr__(self, key, value):
         if key in self.__fields__:
@@ -430,17 +427,28 @@ class MongoModel(DBMixin, BaseModel):
             return {field: value for field, value in data.items() if projection.get(field)}
         return cls.parse_obj(data)
 
+    @classmethod
+    def drop_collection(cls) -> str:
+        value = input(f'Are u sure for drop this collection - {cls.__name__.lower()} (y, n)')
+        if value.lower() == 'y':
+            cls._query('drop')
+            return f'{cls.__name__.lower()} - dropped!'
+        return 'nope'
+
     def save(self, session: Optional[ClientSession] = None) -> Any:
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
             for field in self.__fields__:
                 data[f'{field}__set'] = getattr(self, field)
-            self.update_one(**data)
+            self.update_one(**data, session=session)
             return self
         data = {field: value for field, value in self.__dict__.items() if field in self.__fields__}
         object_id = self.insert_one(**data, session=session)
         self._id = object_id.__str__()
         return self
+
+    def delete(self, session: Optional[ClientSession] = None) -> None:
+        self.__query('delete_one', _id=ObjectId(self._id), session=session)
 
     def _start_session(self) -> ClientSession:
         return self._Meta._connection._mongo_connection.start_session()
