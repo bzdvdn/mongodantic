@@ -19,7 +19,6 @@ class DBConnection(object):
         self.connect_timeout_ms = int(os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS', 50000))
         self.socket_timeout_ms = int(os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS', 60000))
         self._mongo_connection = self.__init_mongo_connection()
-        self.database = self._mongo_connection.get_database(self.db_name)
 
     def __init_mongo_connection(self) -> MongoClient:
         connection_params = dict(

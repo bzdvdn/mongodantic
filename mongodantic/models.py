@@ -34,7 +34,8 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def _get_collection(cls) -> Collection:
-        return cls._Meta._database.get_collection(cls.set_collection_name())
+        db = cls._Meta._connection._mongo_connection.get_database(cls._Meta._connection.db_name)
+        return db.get_collection(cls.set_collection_name())
 
     @classmethod
     def parse_obj(cls, data: Any, reference_model: Optional[ModelMetaclass] = None) -> Any:
@@ -428,10 +429,13 @@ class MongoModel(DBMixin, BaseModel):
         return cls.parse_obj(data)
 
     @classmethod
-    def drop_collection(cls) -> str:
+    def drop_collection(cls, force: bool = False) -> str:
+        if force:
+            cls.__query('drop', query_params={})
+            return f'{cls.__name__.lower()} - dropped!'
         value = input(f'Are u sure for drop this collection - {cls.__name__.lower()} (y, n)')
         if value.lower() == 'y':
-            cls._query('drop')
+            cls.__query('drop', query_params={})
             return f'{cls.__name__.lower()} - dropped!'
         return 'nope'
 
