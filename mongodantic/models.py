@@ -384,49 +384,64 @@ class MongoModel(DBMixin, BaseModel):
         return self.dict()
 
     @classmethod
-    def find_one_and_update(cls, projection: Optional[dict] = None, sort: Optional[dict] = None,
-                            upsert: bool = False, session: Optional[ClientSession] = None, **query) -> Any:
+    def _find_with_replacement_or_with_update(cls, operation: str, projection_fields: Optional[list] = None,
+                                        sort_fields: Union[tuple, list] = ('_id',),
+                                        sort: int = 1, upsert: bool = False,
+                                        session: Optional[ClientSession] = None, **query) -> Any:
         filter_, set_values = cls._ensure_update_data(**query)
         return_document = ReturnDocument.AFTER
-        if sort is not None:
-            sort = [(key, value) for key, value in sort.items()]
+        sort = [(field, sort) for field in sort_fields]
+        replacement = query.pop('replacement', None)
+            
+        if projection_fields:
+            projection = {f: True for f in projection_fields}
+        else:
+            projection = None
+        extra_params = {
+            'return_document': return_document,
+            'projection': projection,
+            'upsert': upsert,
+            'sort': sort,
+            'session': session,
+        }
+        
+        if replacement:
+            extra_params['replacement'] = replacement
+
         data = cls.__query(
-            'find_one_and_update',
+            operation,
             filter_,
             {'$set': set_values},
-            return_document=return_document,
-            projection=projection,
-            upsert=upsert,
-            sort=sort,
-            session=session,
+            **extra_params
         )
         if projection:
             return {field: value for field, value in data.items() if field in projection}
         return cls.parse_obj(data)
 
     @classmethod
+    def find_one_and_update(cls, projection_fields: Optional[list] = None,
+                            sort_fields: Union[tuple, list] = ('_id',),
+                            sort: int = 1, upsert: bool = False,
+                            session: Optional[ClientSession] = None, **query):
+        
+        return cls._find_with_replacement_or_with_update(
+                'find_one_and_update', projection_fields=projection_fields, sort_fields=sort_fields,
+                sort=sort, upsert=upsert, session=session, **query
+        )
+
+    @classmethod
     def find_and_replace(cls, replacement: Union[dict, Any],
-                         projection: Optional[dict] = None, sort: Optional[dict] = None,
+                         projection_fields: Optional[list] = None, sort_fields: Union[tuple, list] = ('_id',),
+                         sort: int = 1,
                          upsert: bool = False, session: Optional[ClientSession] = None,
                          **query) -> Any:
         if isinstance(replacement, BaseModel):
             replacement = replacement.data
-        query = cls._validate_query_data(query)
-        if sort is not None:
-            sort = [(key, value) for key, value in sort.items()]
-        data = cls.__query(
-            'find_one_and_replace',
-            query,
-            replacement,
-            return_document=ReturnDocument.AFTER,
-            projection=projection,
-            upsert=upsert,
-            sort=sort,
-            session=session,
+        return cls._find_with_replacement_or_with_update('find_and_replace',
+            projection_fields=projection_fields, sort_fields=sort_fields,
+            sort=sort, upsert=upsert, session=session, replacement=replacement,
+            **query
         )
-        if projection:
-            return {field: value for field, value in data.items() if projection.get(field)}
-        return cls.parse_obj(data)
 
     @classmethod
     def drop_collection(cls, force: bool = False) -> str:
@@ -452,7 +467,7 @@ class MongoModel(DBMixin, BaseModel):
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
-        self.__query('delete_one', _id=ObjectId(self._id), session=session)
+        self.__query('delete_one', {'_id': ObjectId(self._id)}, session=session)
 
     def _start_session(self) -> ClientSession:
         return self._Meta._connection._mongo_connection.start_session()

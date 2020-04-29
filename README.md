@@ -90,7 +90,7 @@ Banner.find(banner_id__gte=1, banner_id__lte=10) # id >=1 and id <=10
 Banner.find(banner_id__gt=1, banner_id__lt=10) # id >1 and id <10
 
 # find and update
-Banner.find_and_update(banner_id=1, name__set='updated', projection={'name': True}) # return {'name': 'updated}
+Banner.find_and_update(banner_id=1, name__set='updated', projection_fields=['name': True]) # return {'name': 'updated}
 Banner.find_and_update(banner_id=1, name__set='updated') # return Banner obj
 
 
