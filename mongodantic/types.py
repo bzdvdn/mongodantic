@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class ObjectIdStr(str):
     """Field for validate string like ObjectId"""
+
     type_ = ObjectId
     required = False
     default = None
@@ -21,11 +22,13 @@ class ObjectIdStr(str):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v, ):
+    def validate(
+        cls, v,
+    ):
         if isinstance(v, ObjectId):
-            return v, None
+            return v
         else:
             try:
-                return ObjectId(str(v)), None
+                return ObjectId(str(v))
             except InvalidId:
-                return '', ValueError
+                raise ValueError(f"invalid ObjectId - {v}")

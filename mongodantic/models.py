@@ -2,17 +2,34 @@ from typing import TYPE_CHECKING, Dict, Any, Set, List, Generator, Union, Option
 from pymongo.collection import Collection
 from pymongo import ReturnDocument
 from pymongo.client_session import ClientSession
-from pymongo.errors import BulkWriteError, NetworkTimeout, AutoReconnect, ConnectionFailure, WriteConcernError, \
-    ServerSelectionTimeoutError
+from pymongo.errors import (
+    BulkWriteError,
+    NetworkTimeout,
+    AutoReconnect,
+    ConnectionFailure,
+    WriteConcernError,
+    ServerSelectionTimeoutError,
+)
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
 from pydantic import BaseModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
-from .exceptions import NotDeclaredField, InvalidArgument, ValidationError, MongoIndexError, MongoConnectionError, \
-    InvalidArgsParams
-from .helpers import ExtraQueryMapper, chunk_by_length, bulk_query_generator, generate_lookup_project_params
+from .exceptions import (
+    NotDeclaredField,
+    InvalidArgument,
+    ValidationError,
+    MongoIndexError,
+    MongoConnectionError,
+    InvalidArgsParams,
+)
+from .helpers import (
+    ExtraQueryMapper,
+    chunk_by_length,
+    bulk_query_generator,
+    generate_lookup_project_params,
+)
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 
@@ -34,11 +51,15 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def _get_collection(cls) -> Collection:
-        db = cls._Meta._connection._mongo_connection.get_database(cls._Meta._connection.db_name)
+        db = cls._Meta._connection._mongo_connection.get_database(
+            cls._Meta._connection.db_name
+        )
         return db.get_collection(cls.set_collection_name())
 
     @classmethod
-    def parse_obj(cls, data: Any, reference_model: Optional[ModelMetaclass] = None) -> Any:
+    def parse_obj(
+        cls, data: Any, reference_model: Optional[ModelMetaclass] = None
+    ) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = data['_id']
@@ -47,7 +68,9 @@ class MongoModel(DBMixin, BaseModel):
         return obj
 
     @classmethod
-    def __set_reference_fields(cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass) -> ModelMetaclass:
+    def __set_reference_fields(
+        cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass
+    ) -> ModelMetaclass:
         data = data[ref.__name__.lower()]
         if isinstance(data, dict):
             ref_obj = ref.parse_obj(data)
@@ -77,7 +100,10 @@ class MongoModel(DBMixin, BaseModel):
     def __validate_value(cls, field_name: str, value: Any) -> Any:
         field = cls.__fields__[field_name]
         if isinstance(field, ObjectIdStr):
-            value, error_ = field.validate(value)
+            try:
+                value = field.validate(value)
+            except ValueError as e:
+                error_ = e
         else:
             value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
         if error_:
@@ -85,14 +111,24 @@ class MongoModel(DBMixin, BaseModel):
         return value
 
     @classmethod
-    def __check_query_args(cls, logical: Union[Query, LogicalCombination, None] = None) -> Dict:
+    def __check_query_args(
+        cls, logical: Union[Query, LogicalCombination, None] = None
+    ) -> Dict:
         if not isinstance(logical, (LogicalCombination, Query)):
             raise InvalidArgsParams()
         return logical.to_query(cls)
 
     @classmethod
-    def __query(cls, method_name: str, query_params: Union[List, Dict, str], set_values: Optional[Dict] = None,
-                session: Optional[ClientSession] = None, counter: int = 1, logical: bool = False, **kwargs) -> Any:
+    def __query(
+        cls,
+        method_name: str,
+        query_params: Union[List, Dict, str],
+        set_values: Optional[Dict] = None,
+        session: Optional[ClientSession] = None,
+        counter: int = 1,
+        logical: bool = False,
+        **kwargs,
+    ) -> Any:
         inner_query_params = query_params
         if isinstance(query_params, dict) and not logical:
             query_params = cls._validate_query_data(query_params)
@@ -107,14 +143,26 @@ class MongoModel(DBMixin, BaseModel):
             if kwargs:
                 return method(*query, **kwargs)
             return method(*query)
-        except (NetworkTimeout, AutoReconnect, ConnectionFailure, WriteConcernError,
-                ServerSelectionTimeoutError) as description:
+        except (
+            NetworkTimeout,
+            AutoReconnect,
+            ConnectionFailure,
+            WriteConcernError,
+            ServerSelectionTimeoutError,
+        ) as description:
             cls._reconnect()
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
-            return cls.__query(method_name=method_name, query_params=inner_query_params, logical=logical,
-                               set_values=set_values, session=session, counter=counter, **kwargs)
+            return cls.__query(
+                method_name=method_name,
+                query_params=inner_query_params,
+                logical=logical,
+                set_values=set_values,
+                session=session,
+                counter=counter,
+                **kwargs,
+            )
 
     @classmethod
     def check_indexes(cls) -> List:
@@ -127,14 +175,25 @@ class MongoModel(DBMixin, BaseModel):
         return return_list
 
     @classmethod
-    def add_index(cls, index_name: str, index_type: int, background: bool = True, unique: bool = False,
-                  sparse: bool = False) -> str:
+    def add_index(
+        cls,
+        index_name: str,
+        index_type: int,
+        background: bool = True,
+        unique: bool = False,
+        sparse: bool = False,
+    ) -> str:
         indexes = [index['name'] for index in cls.check_indexes()]
         if f'{index_name}_{index_type}' in indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
-            cls.__query('create_index', [(index_name, index_type)],
-                        background=background, unique=unique, sparse=sparse)
+            cls.__query(
+                'create_index',
+                [(index_name, index_type)],
+                background=background,
+                unique=unique,
+                sparse=sparse,
+            )
             return f'index with name - {index_name} created.'
         except Exception as e:
             raise MongoIndexError(f'detail: {str(e)}')
@@ -145,34 +204,47 @@ class MongoModel(DBMixin, BaseModel):
         return f'{index_name} dropped.'
 
     @classmethod
-    def count(cls, logical: Union[Query, LogicalCombination, None] = None,
-              session: Optional[ClientSession] = None, **query) -> int:
+    def count(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> int:
         if logical:
             query = cls.__check_query_args(logical)
         return cls.__query('count', query, session=session, logical=bool(logical))
 
     @classmethod
-    def find_one(cls, logical: Union[Query, LogicalCombination, None] = None,
-                 session: Optional[ClientSession] = None,
-                 sort_fields: Union[tuple, list] = ('_id',),
-                 sort: int = 1,
-                 **query) -> Any:
+    def find_one(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        **query,
+    ) -> Any:
         if logical:
             query = cls.__check_query_args(logical)
         sort_values = [(field, sort) for field in sort_fields]
-        data = cls.__query('find_one', query, session=session, logical=bool(logical), sort=sort_values)
+        data = cls.__query(
+            'find_one', query, session=session, logical=bool(logical), sort=sort_values
+        )
         if data:
             obj = cls.parse_obj(data)
             return obj
         return None
 
     @classmethod
-    def find(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
-             limit_rows: Optional[int] = None,
-             session: Optional[ClientSession] = None,
-             sort_fields: Union[tuple, list] = ('_id',),
-             sort: int = 1,
-             **query) -> QuerySet:
+    def find(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        **query,
+    ) -> QuerySet:
         if logical:
             query = cls.__check_query_args(logical)
         data = cls.__query('find', query, session=session, logical=bool(logical))
@@ -187,22 +259,34 @@ class MongoModel(DBMixin, BaseModel):
         return QuerySet(cls, data.sort(sort_values))
 
     @classmethod
-    def find_with_count(cls, logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
-                        limit_rows: Optional[int] = None,
-                        session: Optional[ClientSession] = None,
-                        sort_fields: Union[tuple, list] = ('_id',),
-                        sort: int = 1,
-                        **query) -> tuple:
+    def find_with_count(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        **query,
+    ) -> tuple:
         if logical:
             query = cls.__check_query_args(logical)
         count = cls.count(**query, session=session, logical=logical)
-        results = cls.find(skip_rows=skip_rows, limit_rows=limit_rows, session=session, logical=logical,
-                           sort_fields=sort_fields, sort=sort, **query)
+        results = cls.find(
+            skip_rows=skip_rows,
+            limit_rows=limit_rows,
+            session=session,
+            logical=logical,
+            sort_fields=sort_fields,
+            sort=sort,
+            **query,
+        )
         return count, results
 
     @classmethod
     def insert_one(cls, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = cls.parse_obj(query)
+        print(obj.data)
         data = cls.__query('insert_one', obj.data, session=session)
         return data.inserted_id
 
@@ -217,16 +301,25 @@ class MongoModel(DBMixin, BaseModel):
         return len(r.inserted_ids)
 
     @classmethod
-    def delete_one(cls, logical: Union[Query, LogicalCombination, None] = None, session: Optional[ClientSession] = None,
-                   **query) -> int:
+    def delete_one(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> int:
         if logical:
             query = cls.__check_query_args(logical)
         r = cls.__query('delete_one', query, session=session, logical=bool(logical))
         return r.deleted_count
 
     @classmethod
-    def delete_many(cls, logical: Union[Query, LogicalCombination, None] = None,
-                    session: Optional[ClientSession] = None, *args, **query) -> int:
+    def delete_many(
+        cls,
+        logical: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        *args,
+        **query,
+    ) -> int:
         if logical:
             query = cls.__check_query_args(logical)
         r = cls.__query('delete_many', query, session=session, logical=bool(logical))
@@ -250,21 +343,39 @@ class MongoModel(DBMixin, BaseModel):
         return queries, set_values
 
     @classmethod
-    def replace_one(cls, replacement: Dict, upsert: bool = False,
-                    session: Optional[ClientSession] = None,
-                    **filter_query) -> Any:
+    def replace_one(
+        cls,
+        replacement: Dict,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+        **filter_query,
+    ) -> Any:
         if not filter_query:
             raise AttributeError('not filter parameters')
         if not replacement:
             raise AttributeError('not replacement parameters')
         filter_query = cls._validate_query_data(filter_query)
         replacement = cls._validate_query_data(replacement)
-        return cls.__query('replace_one', filter_query, replacement=replacement, upsert=upsert, session=session)
+        return cls.__query(
+            'replace_one',
+            filter_query,
+            replacement=replacement,
+            upsert=upsert,
+            session=session,
+        )
 
     @classmethod
-    def raw_query(cls, method_name: str, raw_query: Union[Dict, List[Dict]],
-                  session: Optional[ClientSession] = None) -> Any:
-        if 'insert' in method_name or 'replace' in method_name or 'update' in method_name:
+    def raw_query(
+        cls,
+        method_name: str,
+        raw_query: Union[Dict, List[Dict]],
+        session: Optional[ClientSession] = None,
+    ) -> Any:
+        if (
+            'insert' in method_name
+            or 'replace' in method_name
+            or 'update' in method_name
+        ):
             if isinstance(raw_query, list):
                 raw_query = list(map(cls._validate_query_data, raw_query))
             else:
@@ -274,22 +385,39 @@ class MongoModel(DBMixin, BaseModel):
         return query(raw_query, session=session)
 
     @classmethod
-    def _update(cls, method: str, query: Dict, upsert: bool = True, session: Optional[ClientSession] = None) -> int:
+    def _update(
+        cls,
+        method: str,
+        query: Dict,
+        upsert: bool = True,
+        session: Optional[ClientSession] = None,
+    ) -> int:
         query, set_values = cls._ensure_update_data(**query)
-        r = cls.__query(method, query, {'$set': set_values}, upsert=upsert, session=session)
+        r = cls.__query(
+            method, query, {'$set': set_values}, upsert=upsert, session=session
+        )
         return r.modified_count
 
     @classmethod
-    def update_one(cls, upsert: bool = False, session: Optional[ClientSession] = None, **query) -> int:
+    def update_one(
+        cls, upsert: bool = False, session: Optional[ClientSession] = None, **query
+    ) -> int:
         return cls._update('update_one', query, upsert=upsert, session=session)
 
     @classmethod
-    def update_many(cls, upsert: bool = False, session: Optional[ClientSession] = None, **query) -> int:
+    def update_many(
+        cls, upsert: bool = False, session: Optional[ClientSession] = None, **query
+    ) -> int:
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod
-    def _aggregate_math_operation(cls, operation: str, agg_field: str, session: Optional[ClientSession] = None,
-                                  **query) -> Union[int, QuerySet]:
+    def _aggregate_math_operation(
+        cls,
+        operation: str,
+        agg_field: str,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> Union[int, QuerySet]:
         query = cls._validate_query_data(query)
         data = [
             {"$match": query},
@@ -301,16 +429,21 @@ class MongoModel(DBMixin, BaseModel):
             return 0
 
     @classmethod
-    def aggregate_lookup(cls, local_field: str, from_collection: ModelMetaclass,
-                         foreign_field: Optional[str] = None,
-                         as_: Optional[str] = None,
-                         logical: Union[Query, LogicalCombination, None] = None, skip_rows: Optional[int] = None,
-                         limit_rows: Optional[int] = None,
-                         session: Optional[ClientSession] = None,
-                         sort_fields: Union[tuple, list] = ('_id',),
-                         sort: int = 1,
-                         with_unwing: bool = False,
-                         **query) -> QuerySet:
+    def aggregate_lookup(
+        cls,
+        local_field: str,
+        from_collection: ModelMetaclass,
+        foreign_field: Optional[str] = None,
+        as_: Optional[str] = None,
+        logical: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        with_unwing: bool = False,
+        **query,
+    ) -> QuerySet:
         if logical:
             query = cls.__check_query_args(logical)
         else:
@@ -320,63 +453,108 @@ class MongoModel(DBMixin, BaseModel):
                 "localField": local_field,
                 "from": from_collection.__name__.lower(),
                 "foreignField": foreign_field if foreign_field else "_id",
-                "as": as_ if as_ else from_collection.__name__.lower()
+                "as": as_ if as_ else from_collection.__name__.lower(),
             }
         }
-        project_param = generate_lookup_project_params(cls, from_collection, lookup["$lookup"]["as"])
+        project_param = generate_lookup_project_params(
+            cls, from_collection, lookup["$lookup"]["as"]
+        )
         query_params = [
             {'$match': query},
             lookup,
             {'$project': project_param},
-            {'$sort': {sf: sort for sf in sort_fields}}
+            {'$sort': {sf: sort for sf in sort_fields}},
         ]
         if with_unwing:
             query_params.append({"$unwind": f'${lookup["$lookup"]["as"]}'})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
-        data = cls.__query("aggregate", query_params, session=session, logical=bool(logical))
+        data = cls.__query(
+            "aggregate", query_params, session=session, logical=bool(logical)
+        )
         if skip_rows:
             data = data.skip(skip_rows)
         return QuerySet(cls, data, reference_model=from_collection)
 
     @classmethod
-    def _bulk_operation(cls, models: List, updated_fields: Optional[List] = None,
-                        query_fields: Optional[List] = None, batch_size: Optional[int] = None,
-                        upsert: bool = False, session: Optional[ClientSession] = None) -> None:
+    def _bulk_operation(
+        cls,
+        models: List,
+        updated_fields: Optional[List] = None,
+        query_fields: Optional[List] = None,
+        batch_size: Optional[int] = None,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+    ) -> None:
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
-                data = bulk_query_generator(requests, updated_fields=updated_fields, query_fields=query_fields,
-                                            upsert=upsert)
+                data = bulk_query_generator(
+                    requests,
+                    updated_fields=updated_fields,
+                    query_fields=query_fields,
+                    upsert=upsert,
+                )
                 cls.__query('bulk_write', data, session=session)
             return None
-        data = bulk_query_generator(models, updated_fields=updated_fields, query_fields=query_fields, upsert=upsert)
+        data = bulk_query_generator(
+            models,
+            updated_fields=updated_fields,
+            query_fields=query_fields,
+            upsert=upsert,
+        )
         cls.__query('bulk_write', data, session=session)
 
     @classmethod
-    def bulk_update(cls, models: List, updated_fields: List, batch_size: Optional[int] = None,
-                    session: Optional[ClientSession] = None) -> None:
+    def bulk_update(
+        cls,
+        models: List,
+        updated_fields: List,
+        batch_size: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+    ) -> None:
         if not updated_fields:
             raise ValidationError('updated_fields cannot be empty')
-        return cls._bulk_operation(models, updated_fields=updated_fields, batch_size=batch_size, session=session)
+        return cls._bulk_operation(
+            models,
+            updated_fields=updated_fields,
+            batch_size=batch_size,
+            session=session,
+        )
 
     @classmethod
-    def bulk_update_or_create(cls, models: List, query_fields: List, batch_size: Optional[int] = None,
-                              session: Optional[ClientSession] = None) -> None:
+    def bulk_update_or_create(
+        cls,
+        models: List,
+        query_fields: List,
+        batch_size: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+    ) -> None:
         if not query_fields:
             raise ValidationError('query_fields cannot be empty')
-        return cls._bulk_operation(models, query_fields=query_fields, batch_size=batch_size, upsert=True,
-                                   session=session)
+        return cls._bulk_operation(
+            models,
+            query_fields=query_fields,
+            batch_size=batch_size,
+            upsert=True,
+            session=session,
+        )
 
     @classmethod
-    def aggregate_sum(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
+    def aggregate_sum(
+        cls, agg_field: str, session: Optional[ClientSession] = None, **query
+    ) -> int:
         return cls._aggregate_math_operation('sum', agg_field, session=session, **query)
 
     @classmethod
-    def aggregate_max(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
+    def aggregate_max(
+        cls, agg_field: str, session: Optional[ClientSession] = None, **query
+    ) -> int:
         return cls._aggregate_math_operation('max', agg_field, session=session, **query)
 
     @classmethod
-    def aggregate_min(cls, agg_field: str, session: Optional[ClientSession] = None, **query) -> int:
+    def aggregate_min(
+        cls, agg_field: str, session: Optional[ClientSession] = None, **query
+    ) -> int:
         return cls._aggregate_math_operation('min', agg_field, session=session, **query)
 
     @property
@@ -384,15 +562,21 @@ class MongoModel(DBMixin, BaseModel):
         return self.dict()
 
     @classmethod
-    def _find_with_replacement_or_with_update(cls, operation: str, projection_fields: Optional[list] = None,
-                                        sort_fields: Union[tuple, list] = ('_id',),
-                                        sort: int = 1, upsert: bool = False,
-                                        session: Optional[ClientSession] = None, **query) -> Any:
+    def _find_with_replacement_or_with_update(
+        cls,
+        operation: str,
+        projection_fields: Optional[list] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> Any:
         filter_, set_values = cls._ensure_update_data(**query)
         return_document = ReturnDocument.AFTER
         sort = [(field, sort) for field in sort_fields]
         replacement = query.pop('replacement', None)
-            
+
         if projection_fields:
             projection = {f: True for f in projection_fields}
         else:
@@ -404,43 +588,60 @@ class MongoModel(DBMixin, BaseModel):
             'sort': sort,
             'session': session,
         }
-        
+
         if replacement:
             extra_params['replacement'] = replacement
 
-        data = cls.__query(
-            operation,
-            filter_,
-            {'$set': set_values},
-            **extra_params
-        )
+        data = cls.__query(operation, filter_, {'$set': set_values}, **extra_params)
         if projection:
-            return {field: value for field, value in data.items() if field in projection}
+            return {
+                field: value for field, value in data.items() if field in projection
+            }
         return cls.parse_obj(data)
 
     @classmethod
-    def find_one_and_update(cls, projection_fields: Optional[list] = None,
-                            sort_fields: Union[tuple, list] = ('_id',),
-                            sort: int = 1, upsert: bool = False,
-                            session: Optional[ClientSession] = None, **query):
-        
+    def find_one_and_update(
+        cls,
+        projection_fields: Optional[list] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+        **query,
+    ):
+
         return cls._find_with_replacement_or_with_update(
-                'find_one_and_update', projection_fields=projection_fields, sort_fields=sort_fields,
-                sort=sort, upsert=upsert, session=session, **query
+            'find_one_and_update',
+            projection_fields=projection_fields,
+            sort_fields=sort_fields,
+            sort=sort,
+            upsert=upsert,
+            session=session,
+            **query,
         )
 
     @classmethod
-    def find_and_replace(cls, replacement: Union[dict, Any],
-                         projection_fields: Optional[list] = None, sort_fields: Union[tuple, list] = ('_id',),
-                         sort: int = 1,
-                         upsert: bool = False, session: Optional[ClientSession] = None,
-                         **query) -> Any:
+    def find_and_replace(
+        cls,
+        replacement: Union[dict, Any],
+        projection_fields: Optional[list] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> Any:
         if isinstance(replacement, BaseModel):
             replacement = replacement.data
-        return cls._find_with_replacement_or_with_update('find_and_replace',
-            projection_fields=projection_fields, sort_fields=sort_fields,
-            sort=sort, upsert=upsert, session=session, replacement=replacement,
-            **query
+        return cls._find_with_replacement_or_with_update(
+            'find_and_replace',
+            projection_fields=projection_fields,
+            sort_fields=sort_fields,
+            sort=sort,
+            upsert=upsert,
+            session=session,
+            replacement=replacement,
+            **query,
         )
 
     @classmethod
@@ -448,7 +649,9 @@ class MongoModel(DBMixin, BaseModel):
         if force:
             cls.__query('drop', query_params={})
             return f'{cls.__name__.lower()} - dropped!'
-        value = input(f'Are u sure for drop this collection - {cls.__name__.lower()} (y, n)')
+        value = input(
+            f'Are u sure for drop this collection - {cls.__name__.lower()} (y, n)'
+        )
         if value.lower() == 'y':
             cls.__query('drop', query_params={})
             return f'{cls.__name__.lower()} - dropped!'
@@ -461,7 +664,11 @@ class MongoModel(DBMixin, BaseModel):
                 data[f'{field}__set'] = getattr(self, field)
             self.update_one(**data, session=session)
             return self
-        data = {field: value for field, value in self.__dict__.items() if field in self.__fields__}
+        data = {
+            field: value
+            for field, value in self.__dict__.items()
+            if field in self.__fields__
+        }
         object_id = self.insert_one(**data, session=session)
         self._id = object_id.__str__()
         return self
