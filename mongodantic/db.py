@@ -1,6 +1,6 @@
 import os
 from typing import Optional
-from pymongo import MongoClient
+from pymongo import MongoClient, database
 
 
 class DBConnection(object):
@@ -43,5 +43,10 @@ class DBConnection(object):
 
     def _reconnect(self):
         self._mongo_connection = self.__init_mongo_connection()
-        self.database = self._mongo_connection.get_database(self.db_name)
         return self
+
+    def get_database(self) -> database.Database:
+        if hasattr(self, '_database'):
+            return self._database
+        self._database = self._mongo_connection.get_database(self.db_name)
+        return self._database

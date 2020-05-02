@@ -51,9 +51,7 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def _get_collection(cls) -> Collection:
-        db = cls._Meta._connection._mongo_connection.get_database(
-            cls._Meta._connection.db_name
-        )
+        db = cls.get_database()
         return db.get_collection(cls.set_collection_name())
 
     @classmethod
@@ -112,11 +110,11 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def __check_query_args(
-        cls, logical: Union[Query, LogicalCombination, None] = None
+        cls, logical_query: Union[Query, LogicalCombination, None] = None
     ) -> Dict:
-        if not isinstance(logical, (LogicalCombination, Query)):
+        if not isinstance(logical_query, (LogicalCombination, Query)):
             raise InvalidArgsParams()
-        return logical.to_query(cls)
+        return logical_query.to_query(cls)
 
     @classmethod
     def __query(
@@ -157,7 +155,7 @@ class MongoModel(DBMixin, BaseModel):
             return cls.__query(
                 method_name=method_name,
                 query_params=inner_query_params,
-                logical=logical,
+                logical_query=logical_query,
                 set_values=set_values,
                 session=session,
                 counter=counter,
@@ -206,28 +204,32 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def count(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        if logical:
-            query = cls.__check_query_args(logical)
-        return cls.__query('count', query, session=session, logical=bool(logical))
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
+        return cls.__query('count', query, session=session, logical=bool(logical_query))
 
     @classmethod
     def find_one(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
         sort_fields: Union[tuple, list] = ('_id',),
         sort: int = 1,
         **query,
     ) -> Any:
-        if logical:
-            query = cls.__check_query_args(logical)
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
         sort_values = [(field, sort) for field in sort_fields]
         data = cls.__query(
-            'find_one', query, session=session, logical=bool(logical), sort=sort_values
+            'find_one',
+            query,
+            session=session,
+            logical=bool(logical_query),
+            sort=sort_values,
         )
         if data:
             obj = cls.parse_obj(data)
@@ -237,7 +239,7 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def find(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
@@ -245,9 +247,9 @@ class MongoModel(DBMixin, BaseModel):
         sort: int = 1,
         **query,
     ) -> QuerySet:
-        if logical:
-            query = cls.__check_query_args(logical)
-        data = cls.__query('find', query, session=session, logical=bool(logical))
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
+        data = cls.__query('find', query, session=session, logical=bool(logical_query))
         if skip_rows is not None:
             data = data.skip(skip_rows)
         if limit_rows:
@@ -261,7 +263,7 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def find_with_count(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
@@ -269,14 +271,14 @@ class MongoModel(DBMixin, BaseModel):
         sort: int = 1,
         **query,
     ) -> tuple:
-        if logical:
-            query = cls.__check_query_args(logical)
-        count = cls.count(**query, session=session, logical=logical)
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
+        count = cls.count(**query, session=session, logical_query=logical_query)
         results = cls.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,
             session=session,
-            logical=logical,
+            logical_query=logical_query,
             sort_fields=sort_fields,
             sort=sort,
             **query,
@@ -303,26 +305,30 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def delete_one(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        if logical:
-            query = cls.__check_query_args(logical)
-        r = cls.__query('delete_one', query, session=session, logical=bool(logical))
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
+        r = cls.__query(
+            'delete_one', query, session=session, logical=bool(logical_query)
+        )
         return r.deleted_count
 
     @classmethod
     def delete_many(
         cls,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
         *args,
         **query,
     ) -> int:
-        if logical:
-            query = cls.__check_query_args(logical)
-        r = cls.__query('delete_many', query, session=session, logical=bool(logical))
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
+        r = cls.__query(
+            'delete_many', query, session=session, logical=bool(logical_query)
+        )
         return r.deleted_count
 
     @classmethod
@@ -435,7 +441,7 @@ class MongoModel(DBMixin, BaseModel):
         from_collection: ModelMetaclass,
         foreign_field: Optional[str] = None,
         as_: Optional[str] = None,
-        logical: Union[Query, LogicalCombination, None] = None,
+        logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
@@ -444,8 +450,8 @@ class MongoModel(DBMixin, BaseModel):
         with_unwing: bool = False,
         **query,
     ) -> QuerySet:
-        if logical:
-            query = cls.__check_query_args(logical)
+        if logical_query:
+            query = cls.__check_query_args(logical_query)
         else:
             query = cls._validate_query_data(query)
         lookup = {
@@ -470,7 +476,7 @@ class MongoModel(DBMixin, BaseModel):
         if limit_rows:
             query_params.append({'$limit': limit_rows})
         data = cls.__query(
-            "aggregate", query_params, session=session, logical=bool(logical)
+            "aggregate", query_params, session=session, logical=bool(logical_query)
         )
         if skip_rows:
             data = data.skip(skip_rows)
@@ -482,7 +488,7 @@ class MongoModel(DBMixin, BaseModel):
         models: List,
         updated_fields: Optional[List] = None,
         query_fields: Optional[List] = None,
-        batch_size: Optional[int] = None,
+        batch_size: Optional[int] = 10000,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
     ) -> None:
@@ -526,7 +532,7 @@ class MongoModel(DBMixin, BaseModel):
         cls,
         models: List,
         query_fields: List,
-        batch_size: Optional[int] = None,
+        batch_size: Optional[int] = 10000,
         session: Optional[ClientSession] = None,
     ) -> None:
         if not query_fields:

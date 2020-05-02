@@ -2,9 +2,12 @@ from .db import DBConnection
 
 
 class DBMixin(object):
-    class _Meta:
-        _connection = DBConnection()
+    _connection = DBConnection()
 
     @classmethod
     def _reconnect(cls):
-        cls._Meta._connection = cls._Meta._connection._reconnect()
+        cls._connection = cls._connection._reconnect()
+
+    @classmethod
+    def get_database(cls):
+        return cls._connection.get_database()
