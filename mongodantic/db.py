@@ -15,9 +15,15 @@ class DBConnection(object):
         self.max_pool_size = int(os.environ.get('MONGODANTIC_POOL_SIZE', 100))
         self.ssl = True if int(os.environ.get('MONGODANTIC_SSL', 0)) else False
         self.ssl_cert_path = os.environ.get('MONGODANTIC_SSL_CERT_PATH')
-        self.server_selection_timeout_ms = int(os.environ.get('MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS', 50000))
-        self.connect_timeout_ms = int(os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS', 50000))
-        self.socket_timeout_ms = int(os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS', 60000))
+        self.server_selection_timeout_ms = int(
+            os.environ.get('MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS', 50000)
+        )
+        self.connect_timeout_ms = int(
+            os.environ.get('MONGODANTIC_CONNECT_TIMEOUT_MS', 50000)
+        )
+        self.socket_timeout_ms = int(
+            os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS', 60000)
+        )
         self._mongo_connection = self.__init_mongo_connection()
 
     def __init_mongo_connection(self) -> MongoClient:
@@ -33,10 +39,7 @@ class DBConnection(object):
         if self.ssl:
             connection_params['tlsCAFile'] = self.ssl_cert_path
             connection_params['tlsAllowInvalidCertificates'] = self.ssl
-        return MongoClient(
-            self.connection_string,
-            **connection_params
-        )
+        return MongoClient(self.connection_string, **connection_params)
 
     def _reconnect(self):
         self._mongo_connection = self.__init_mongo_connection()

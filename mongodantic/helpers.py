@@ -1,9 +1,15 @@
+from re import compile
 from typing import List, Any, Dict, Tuple, Union, Optional, Callable
 from pydantic.main import ModelMetaclass
 from bson import ObjectId
 from pymongo import UpdateOne
-from pymongo.errors import ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, \
-    WriteConcernError
+from pymongo.errors import (
+    ServerSelectionTimeoutError,
+    AutoReconnect,
+    NetworkTimeout,
+    ConnectionFailure,
+    WriteConcernError,
+)
 
 from .exceptions import MongoConnectionError
 
@@ -14,14 +20,18 @@ class ExtraQueryMapper(object):
 
     def extra_query(self, extra_methods: List, values) -> Dict:
         if self.field_name == '_id':
-            values = [ObjectId(v) for v in values] if isinstance(values, list) else ObjectId(values)
+            values = (
+                [ObjectId(v) for v in values]
+                if isinstance(values, list)
+                else ObjectId(values)
+            )
         if extra_methods:
             query = {self.field_name: {}}
             for extra_method in extra_methods:
                 if extra_method == 'in':
                     extra_method = 'in_'
                 elif extra_method == 'inc':
-                    return self.inc(value)
+                    return self.inc(values)
                 query[self.field_name].update(getattr(self, extra_method)(values))
             return query
         return {}
@@ -35,7 +45,7 @@ class ExtraQueryMapper(object):
         return {"$regex": regex_value}
 
     def regex_ne(self, regex_value: str):
-        return {"not": {"$regex": regex_value}}
+        return {"$not": compile(regex_value)}
 
     def ne(self, value: Any):
         return {"$ne": value}
@@ -44,13 +54,13 @@ class ExtraQueryMapper(object):
         return {"$regex": f"^{value}"}
 
     def not_startswith(self, value: str):
-        return {"not": {"$regex": f"^{value}"}}
+        return {"$not": compile(f"^{value}")}
 
     def endswith(self, value: str):
         return {"$regex": f"{value}$"}
 
     def not_endswith(self, value: str):
-        return {"not": {"$regex": f"{value}$"}}
+        return {"$not": compile(f"{value}$")}
 
     def nin(self, list_values: List):
         if not isinstance(list_values, list):
@@ -58,6 +68,8 @@ class ExtraQueryMapper(object):
         return {"$nin": list_values}
 
     def exists(self, boolean_value: bool):
+        if not isinstance(boolean_value, bool):
+            raise TypeError("boolean_value must be a bool type")
         return {"$exists": boolean_value}
 
     def type(self, bson_type):
@@ -91,11 +103,15 @@ class ExtraQueryMapper(object):
 def chunk_by_length(items: List, step: int):
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(items), step):
-        yield items[i: i + step]
+        yield items[i : i + step]
 
 
-def bulk_query_generator(requests: List, updated_fields: Optional[List] = None,
-                         query_fields: Optional[List] = None, upsert=False) -> List:
+def bulk_query_generator(
+    requests: List,
+    updated_fields: Optional[List] = None,
+    query_fields: Optional[List] = None,
+    upsert=False,
+) -> List:
     data = []
     if updated_fields:
         for obj in requests:
@@ -123,14 +139,24 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
-        except (ServerSelectionTimeoutError, AutoReconnect, NetworkTimeout, ConnectionFailure, WriteConcernError) as e:
+        except (
+            ServerSelectionTimeoutError,
+            AutoReconnect,
+            NetworkTimeout,
+            ConnectionFailure,
+            WriteConcernError,
+        ) as e:
             raise MongoConnectionError(str(e))
+
     return wrapper
 
 
-def generate_lookup_project_params(main_model: ModelMetaclass, reference_model: ModelMetaclass, as_: str) -> Dict:
+def generate_lookup_project_params(
+    main_model: ModelMetaclass, reference_model: ModelMetaclass, as_: str
+) -> Dict:
     project_param = {f: 1 for f in main_model.__fields__}
     project_param['_id'] = 1
     project_param.update(
-        {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())})
+        {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())}
+    )
     return project_param

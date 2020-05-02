@@ -6,7 +6,12 @@ from .helpers import handle_and_convert_connection_errors
 
 
 class QuerySet(object):
-    def __init__(self, model: ModelMetaclass, data: Generator, reference_model: Optional[ModelMetaclass] = None):
+    def __init__(
+        self,
+        model: ModelMetaclass,
+        data: Generator,
+        reference_model: Optional[ModelMetaclass] = None,
+    ):
         self._data = data
         self._model = model
         self._reference_model = reference_model

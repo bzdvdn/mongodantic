@@ -8,4 +8,3 @@ class DBMixin(object):
     @classmethod
     def _reconnect(cls):
         cls._Meta._connection = cls._Meta._connection._reconnect()
-
