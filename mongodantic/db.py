@@ -13,7 +13,7 @@ class DBConnection(object):
         self.connection_string = os.environ.get('MONGODANTIC_CONNECTION_STR')
         self.db_name = os.environ.get('MONGODANTIC_DBNAME')
         self.max_pool_size = int(os.environ.get('MONGODANTIC_POOL_SIZE', 100))
-        self.ssl = True if int(os.environ.get('MONGODANTIC_SSL', 0)) else False
+        self.ssl = bool(int(os.environ.get('MONGODANTIC_SSL', 0)))
         self.ssl_cert_path = os.environ.get('MONGODANTIC_SSL_CERT_PATH')
         self.server_selection_timeout_ms = int(
             os.environ.get('MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS', 50000)
