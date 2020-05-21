@@ -198,8 +198,15 @@ class MongoModel(DBMixin, BaseModel):
 
     @classmethod
     def drop_index(cls, index_name: str) -> str:
-        cls.__query('drop_index', index_name)
-        return f'{index_name} dropped.'
+        indexes = cls.check_indexes()
+        drop = False
+        for index in indexes:
+            if f'{index_name}_' in index['name']:
+                drop = True
+                cls.__query('drop_index', index['name'])
+        if drop:
+            return f'{index_name} dropped.'
+        raise MongoIndexError(f'invalid index name - {index_name}')
 
     @classmethod
     def count(
