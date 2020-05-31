@@ -155,10 +155,10 @@ class MongoModel(DBMixin, BaseModel):
             return cls.__query(
                 method_name=method_name,
                 query_params=inner_query_params,
-                logical_query=logical_query,
                 set_values=set_values,
                 session=session,
                 counter=counter,
+                logical=logical,
                 **kwargs,
             )
 
