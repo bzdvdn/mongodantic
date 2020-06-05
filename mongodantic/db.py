@@ -28,7 +28,7 @@ class DBConnection(object):
 
     def __init_mongo_connection(self) -> MongoClient:
         connection_params = dict(
-            connect=True,
+            connect=False,
             serverSelectionTimeoutMS=self.server_selection_timeout_ms,
             maxPoolSize=self.max_pool_size,
             connectTimeoutMS=self.connect_timeout_ms,
