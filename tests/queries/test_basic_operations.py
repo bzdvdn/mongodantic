@@ -13,6 +13,11 @@ class TestBasicOperation(unittest.TestCase):
             name: str
             position: int
             config: dict
+            sign: int = 1
+            type_: str = 'ga'
+
+            class Config:
+                excluded_query_fields = ('sign', 'type')
 
         Ticket.drop_collection(force=True)
         self.Ticket = Ticket
@@ -21,6 +26,14 @@ class TestBasicOperation(unittest.TestCase):
         data = {'name': 'first', 'position': 1, 'config': {'param1': 'value'}}
         object_id = self.Ticket.insert_one(**data)
         assert isinstance(object_id, ObjectId)
+
+    def test_data_by_fields(self):
+        self.test_insert_one()
+        data = self.Ticket.find_one().data_by_fields(('position', 'type_', 'sign'))
+        keys = list(data.keys())
+        assert 1 == keys.index('type_')
+        assert 0 == keys.index('position')
+        assert 2 == keys.index('sign')
 
     def test_insert_many(self):
         data = [
