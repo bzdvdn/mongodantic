@@ -39,6 +39,9 @@ __all__ = ('MongoModel', 'QuerySet', 'Query')
 class MongoModel(DBMixin, BaseModel):
     _id: ObjectIdStr = None
 
+    class Config:
+        excluded_query_fields = ()
+
     def __setattr__(self, key, value):
         if key in self.__fields__:
             return super().__setattr__(key, value)
@@ -82,6 +85,10 @@ class MongoModel(DBMixin, BaseModel):
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
+            if field in cls.Config.excluded_query_fields:
+                raise AttributeError(
+                    f'{field} is constant, you cant get query by this field'
+                )
             if field not in cls.__fields__ and field != '_id':
                 raise NotDeclaredField(field, list(cls.__fields__.keys()))
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
@@ -574,6 +581,10 @@ class MongoModel(DBMixin, BaseModel):
     def data(self) -> Dict:
         return self.dict()
 
+    def data_by_fields(self, fields: Union[tuple, list]) -> dict:
+        data = self.dict(include=set(fields))
+        return {f: data[f] for f in fields}
+
     @classmethod
     def _find_with_replacement_or_with_update(
         cls,
@@ -691,3 +702,10 @@ class MongoModel(DBMixin, BaseModel):
 
     def _start_session(self) -> ClientSession:
         return self._Meta._connection._mongo_connection.start_session()
+
+    @classmethod
+    def sort_fields(cls, fields: Union[tuple, list, None]) -> None:
+        if fields:
+            new_sort = {field: cls.__fields__[field] for field in fields}
+            cls.__fields__ = new_sort
+

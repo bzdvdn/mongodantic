@@ -1,4 +1,4 @@
-from typing import Generator, List, Optional
+from typing import Generator, List, Optional, Union
 from pydantic.main import ModelMetaclass
 
 
@@ -39,3 +39,10 @@ class QuerySet(object):
 
     def first(self) -> any:
         return next(self.__iter__())
+
+    def data_by_fields(self, fields: Union[tuple, List]) -> List:
+        return [obj.data_by_fields(fields) for obj in self.__iter__()]
+
+    def data_by_fields_generator(self, fields: Union[tuple, List]) -> Generator:
+        for obj in self.__iter__():
+            yield obj.data_by_fields(fields)
