@@ -81,18 +81,20 @@ class MongoModel(DBMixin, BaseModel):
         return obj
 
     @classmethod
-    def __is_field_in_exclude(cls, field: str) -> bool:
-        return field in cls.Config.excluded_query_fields
+    def __validate_field(cls, field: str) -> bool:
+        if field not in cls.__fields__ and field != '_id':
+            raise NotDeclaredField(field, list(cls.__fields__.keys()))
+        elif field in cls.Config.excluded_query_fields:
+            return False
+        return True
 
     @classmethod
     def _validate_query_data(cls, query: Dict) -> Dict:
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
-            if cls.__is_field_in_exclude(field):
+            if not cls.__validate_field(field):
                 continue
-            if field not in cls.__fields__ and field != '_id':
-                raise NotDeclaredField(field, list(cls.__fields__.keys()))
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
             if _dict:
                 value = _dict[field]
