@@ -39,6 +39,27 @@ class TestAggregation(unittest.TestCase):
         sum_ = self.Product.aggregate_sum(agg_field='cost')
         assert sum_ == 10
 
+    def test_aggregation_multiply(self):
+        data = [
+            self.Product(title=str(i), cost=float(i), quantity=i - 1)
+            for i in range(1, 5)
+        ]
+        self.Product.insert_many(data)
+        result_sum = self.Product.aggregate_sum_multiply(
+            agg_fields=['cost', 'quantity']
+        )
+        assert result_sum == {'cost__sum': 10.0, 'quantity__sum': 6}
+
+        result_max = self.Product.aggregate_max_multiply(
+            agg_fields=['cost', 'quantity']
+        )
+        assert result_max == {'cost__max': 4.0, 'quantity__max': 3}
+
+        result_min = self.Product.aggregate_min_multiply(
+            agg_fields=['cost', 'quantity']
+        )
+        assert result_min == {'cost__min': 1.0, 'quantity__min': 0}
+
     def test_aggregate_lookup(self):
 
         product_inserted_id = self.Product.insert_one(

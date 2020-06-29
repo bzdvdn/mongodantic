@@ -435,6 +435,62 @@ class MongoModel(DBMixin, BaseModel):
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod
+    def _aggregate_multiply_math_operations(
+        cls,
+        operation: str,
+        agg_fields: Union[tuple, list],
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> dict:
+        query = cls._validate_query_data(query)
+        aggregate_query = {
+            f'{f}__{operation}': {f"${operation}": f"${f}"} for f in agg_fields
+        }
+        data = [
+            {"$match": query},
+            {"$group": {"_id": None, **aggregate_query}},
+        ]
+        try:
+            result = cls.__query("aggregate", data, session=session).next()
+            print(result)
+            return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
+        except StopIteration:
+            return {f'{f}__{operation}': 0 for f in agg_fields}
+
+    @classmethod
+    def aggregate_sum_multiply(
+        cls,
+        agg_fields: Union[tuple, list],
+        session: Optional[ClientSession] = None,
+        **query,
+    ):
+        return cls._aggregate_multiply_math_operations(
+            'sum', agg_fields=agg_fields, session=session, **query
+        )
+
+    @classmethod
+    def aggregate_max_multiply(
+        cls,
+        agg_fields: Union[tuple, list],
+        session: Optional[ClientSession] = None,
+        **query,
+    ):
+        return cls._aggregate_multiply_math_operations(
+            'max', agg_fields=agg_fields, session=session, **query
+        )
+
+    @classmethod
+    def aggregate_min_multiply(
+        cls,
+        agg_fields: Union[tuple, list],
+        session: Optional[ClientSession] = None,
+        **query,
+    ):
+        return cls._aggregate_multiply_math_operations(
+            'min', agg_fields=agg_fields, session=session, **query
+        )
+
+    @classmethod
     def _aggregate_math_operation(
         cls,
         operation: str,
