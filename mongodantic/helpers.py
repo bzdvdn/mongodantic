@@ -160,3 +160,11 @@ def generate_lookup_project_params(
         {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())}
     )
     return project_param
+
+
+def generate_operator_for_multiply_aggregations(
+    field: str, operator: Optional[str] = None, fields_operations: Optional[dict] = None
+) -> str:
+    if operator:
+        return operator
+    return fields_operations[field]

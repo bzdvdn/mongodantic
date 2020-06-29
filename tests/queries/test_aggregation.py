@@ -60,6 +60,12 @@ class TestAggregation(unittest.TestCase):
         )
         assert result_min == {'cost__min': 1.0, 'quantity__min': 0}
 
+        result_multiply = self.Product.aggregate_multiply_math_operations(
+            agg_fields=['cost', 'quantity'],
+            fields_operations={'cost': 'sum', 'quantity': 'max'},
+        )
+        assert result_multiply == {'cost__sum': 10.0, 'quantity__max': 3}
+
     def test_aggregate_lookup(self):
 
         product_inserted_id = self.Product.insert_one(

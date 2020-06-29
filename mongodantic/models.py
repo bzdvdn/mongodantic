@@ -29,6 +29,7 @@ from .helpers import (
     chunk_by_length,
     bulk_query_generator,
     generate_lookup_project_params,
+    generate_operator_for_multiply_aggregations,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
@@ -435,16 +436,45 @@ class MongoModel(DBMixin, BaseModel):
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod
-    def _aggregate_multiply_math_operations(
+    def aggregate_multiply_math_operations(
         cls,
-        operation: str,
-        agg_fields: Union[tuple, list],
+        agg_fields: Union[list, tuple],
+        fields_operations: dict,
         session: Optional[ClientSession] = None,
         **query,
+    ):
+        for f in agg_fields:
+            if f not in fields_operations:
+                raise ValidationError(f'{f} not in fields_operations')
+            elif fields_operations[f] not in ('sum', 'max', 'min'):
+                raise ValidationError(
+                    f'{fields_operations[f]} invalid aggregation operation'
+                )
+        return cls._aggregate_multiply_math_operations(
+            agg_fields=agg_fields,
+            fields_operations=fields_operations,
+            session=session,
+            **query,
+        )
+
+    @classmethod
+    def _aggregate_multiply_math_operations(
+        cls,
+        agg_fields: Union[tuple, list],
+        operation: Optional[str] = None,
+        session: Optional[ClientSession] = None,
+        fields_operations: Optional[dict] = None,
+        **query,
     ) -> dict:
+        if not operation and not fields_operations:
+            raise ValidationError('miss operation or fields_operations')
+
         query = cls._validate_query_data(query)
         aggregate_query = {
-            f'{f}__{operation}': {f"${operation}": f"${f}"} for f in agg_fields
+            f'{f}__{generate_operator_for_multiply_aggregations(f, operation, fields_operations)}': {
+                f"${generate_operator_for_multiply_aggregations(f, operation, fields_operations)}": f"${f}"
+            }
+            for f in agg_fields
         }
         data = [
             {"$match": query},
@@ -455,7 +485,10 @@ class MongoModel(DBMixin, BaseModel):
             print(result)
             return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
         except StopIteration:
-            return {f'{f}__{operation}': 0 for f in agg_fields}
+            return {
+                f'{f}__{generate_operator_for_multiply_aggregations(f, operation, fields_operations)}': 0
+                for f in agg_fields
+            }
 
     @classmethod
     def aggregate_sum_multiply(
@@ -465,7 +498,7 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ):
         return cls._aggregate_multiply_math_operations(
-            'sum', agg_fields=agg_fields, session=session, **query
+            operation='sum', agg_fields=agg_fields, session=session, **query
         )
 
     @classmethod
@@ -476,7 +509,7 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ):
         return cls._aggregate_multiply_math_operations(
-            'max', agg_fields=agg_fields, session=session, **query
+            operation='max', agg_fields=agg_fields, session=session, **query
         )
 
     @classmethod
@@ -487,7 +520,7 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ):
         return cls._aggregate_multiply_math_operations(
-            'min', agg_fields=agg_fields, session=session, **query
+            operation='min', agg_fields=agg_fields, session=session, **query
         )
 
     @classmethod
