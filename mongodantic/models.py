@@ -307,7 +307,6 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def insert_one(cls, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = cls.parse_obj(query)
-        print(obj.data)
         data = cls.__query('insert_one', obj.data, session=session)
         return data.inserted_id
 
@@ -482,7 +481,6 @@ class MongoModel(DBMixin, BaseModel):
         ]
         try:
             result = cls.__query("aggregate", data, session=session).next()
-            print(result)
             return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
         except StopIteration:
             return {

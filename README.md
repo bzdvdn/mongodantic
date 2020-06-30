@@ -26,7 +26,7 @@ class Banner(MongoModel):
     utm: dict
 
 # if you need take an existing collection, you must reimplement set_collection_name method like that
-class Benner(MongoModel):
+class Banner(MongoModel):
     ...
 
     @classmethod
