@@ -40,9 +40,9 @@ class QuerySet(object):
     def first(self) -> any:
         return next(self.__iter__())
 
-    def data_by_fields(self, fields: Union[tuple, List]) -> List:
-        return [obj.data_by_fields(fields) for obj in self.__iter__()]
+    def serialize(self, fields: Union[tuple, List]) -> List:
+        return [obj.serialize(fields) for obj in self.__iter__()]
 
-    def data_by_fields_generator(self, fields: Union[tuple, List]) -> Generator:
+    def serialize_generator(self, fields: Union[tuple, List]) -> Generator:
         for obj in self.__iter__():
-            yield obj.data_by_fields(fields)
+            yield obj.serialize(fields)

@@ -27,9 +27,9 @@ class TestBasicOperation(unittest.TestCase):
         object_id = self.Ticket.insert_one(**data)
         assert isinstance(object_id, ObjectId)
 
-    def test_data_by_fields(self):
+    def test_serialize(self):
         self.test_insert_one()
-        data = self.Ticket.find_one().data_by_fields(('position', 'type_', 'sign'))
+        data = self.Ticket.find_one().serialize(('position', 'type_', 'sign'))
         keys = list(data.keys())
         assert 1 == keys.index('type_')
         assert 0 == keys.index('position')
@@ -58,6 +58,14 @@ class TestBasicOperation(unittest.TestCase):
         assert isinstance(data, list)
         assert len(data) == 2
         assert isinstance(data[0], MongoModel)
+
+    def test_queryset_serialize(self):
+        self.test_insert_many()
+        data = self.Ticket.find(name='second').serialize(fields=['name', 'config'])
+        assert len(data[0]) == 2
+        assert data[0]['config'] == {'param1': '2222'}
+        assert data[0]['name'] == 'second'
+        assert isinstance(data, list)
 
     def test_delete_one(self):
         self.test_insert_one()

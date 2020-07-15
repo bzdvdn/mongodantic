@@ -1,9 +1,12 @@
 import unittest
 from bson import ObjectId
+from random import randint
 
 from mongodantic.models import MongoModel
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
+
+product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
 
 class TestAggregation(unittest.TestCase):
@@ -14,6 +17,7 @@ class TestAggregation(unittest.TestCase):
             title: str
             cost: float
             quantity: int
+            product_type: str
 
         class ProductImage(MongoModel):
             url: str
@@ -27,7 +31,13 @@ class TestAggregation(unittest.TestCase):
 
     def test_aggregation_math_operation(self):
         data = [
-            self.Product(title=str(i), cost=float(i), quantity=i) for i in range(1, 5)
+            self.Product(
+                title=str(i),
+                cost=float(i),
+                quantity=i,
+                product_type=product_types[randint(1, 3)],
+            )
+            for i in range(1, 5)
         ]
         self.Product.insert_many(data)
         max_ = self.Product.aggregate_max(agg_field='cost')
@@ -41,7 +51,12 @@ class TestAggregation(unittest.TestCase):
 
     def test_aggregation_multiply(self):
         data = [
-            self.Product(title=str(i), cost=float(i), quantity=i - 1)
+            self.Product(
+                title=str(i),
+                cost=float(i),
+                quantity=i - 1,
+                product_type=product_types[2],
+            )
             for i in range(1, 5)
         ]
         self.Product.insert_many(data)
@@ -66,12 +81,27 @@ class TestAggregation(unittest.TestCase):
         )
         assert result_multiply == {'cost__sum': 10.0, 'quantity__max': 3}
 
+        result_count = self.Product.aggregate_count(agg_field='product_type')
+        assert result_count == {'book': 4}
+
+        result_multiply_count = self.Product.aggregate_multiply_count(
+            agg_fields=['product_type', 'quantity']
+        )
+        assert result_multiply_count == [
+            {'_id': {'product_type': 'book', 'quantity': 3}, 'count': 1},
+            {'_id': {'product_type': 'book', 'quantity': 2}, 'count': 1},
+            {'_id': {'product_type': 'book', 'quantity': 0}, 'count': 1},
+            {'_id': {'product_type': 'book', 'quantity': 1}, 'count': 1},
+        ]
+
     def test_aggregate_lookup(self):
 
         product_inserted_id = self.Product.insert_one(
-            title='product1', cost=23.00, quantity=23
+            title='product1',
+            cost=23.00,
+            quantity=23,
+            product_type=product_types[randint(1, 3)],
         )
-        print('pp - ', product_inserted_id)
         image_inserted_id = self.ProductImage.insert_one(
             url='http://localhost:8000/image.png',
             product_id=ObjectId(product_inserted_id),

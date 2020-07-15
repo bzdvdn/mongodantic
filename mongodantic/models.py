@@ -435,6 +435,39 @@ class MongoModel(DBMixin, BaseModel):
         return cls._update('update_many', query, upsert=upsert, session=session)
 
     @classmethod
+    def aggregate_count(
+        cls, agg_field: str, session: Optional[ClientSession] = None, **query,
+    ) -> dict:
+        query = cls._validate_query_data(query)
+        data = [
+            {"$match": query},
+            {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
+        ]
+        result = cls.__query("aggregate", data, session=session)
+        return {r['_id']: r['count'] for r in result}
+
+    @classmethod
+    def aggregate_multiply_count(
+        cls,
+        agg_fields: Union[List, tuple],
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> list:
+        query = cls._validate_query_data(query)
+        data = [
+            {"$match": query},
+            {
+                "$group": {
+                    "_id": {field: f'${field}' for field in agg_fields},
+                    "count": {"$sum": 1},
+                }
+            },
+        ]
+
+        result = cls.__query("aggregate", data, session=session)
+        return list(result)
+
+    @classmethod
     def aggregate_multiply_math_operations(
         cls,
         agg_fields: Union[list, tuple],
@@ -672,7 +705,7 @@ class MongoModel(DBMixin, BaseModel):
     def data(self) -> Dict:
         return self.dict()
 
-    def data_by_fields(self, fields: Union[tuple, list]) -> dict:
+    def serialize(self, fields: Union[tuple, list]) -> dict:
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
 
