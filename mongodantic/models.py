@@ -12,7 +12,7 @@ from pymongo.errors import (
 )
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
-from pydantic import BaseModel
+from pydantic import BaseModel as BasePydanticModel
 
 from .mixins import DBMixin
 from .types import ObjectIdStr
@@ -37,7 +37,7 @@ from .logical import LogicalCombination, Query
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
-class MongoModel(DBMixin, BaseModel):
+class BaseModel(DBMixin, BasePydanticModel):
     _id: ObjectIdStr = None
 
     class Config:
@@ -121,7 +121,7 @@ class MongoModel(DBMixin, BaseModel):
         return value
 
     @classmethod
-    def __check_query_args(
+    def _check_query_args(
         cls, logical_query: Union[Query, LogicalCombination, None] = None
     ) -> Dict:
         if not isinstance(logical_query, (LogicalCombination, Query)):
@@ -129,7 +129,7 @@ class MongoModel(DBMixin, BaseModel):
         return logical_query.to_query(cls)
 
     @classmethod
-    def __query(
+    def _query(
         cls,
         method_name: str,
         query_params: Union[List, Dict, str],
@@ -164,7 +164,7 @@ class MongoModel(DBMixin, BaseModel):
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
-            return cls.__query(
+            return cls._query(
                 method_name=method_name,
                 query_params=inner_query_params,
                 set_values=set_values,
@@ -174,9 +174,11 @@ class MongoModel(DBMixin, BaseModel):
                 **kwargs,
             )
 
+
+class MongoModel(BaseModel):
     @classmethod
     def check_indexes(cls) -> List:
-        index_list = list(cls.__query('list_indexes', {}))
+        index_list = list(cls._query('list_indexes', {}))
         return_list = []
         for index in index_list:
             d = dict(index)
@@ -197,7 +199,7 @@ class MongoModel(DBMixin, BaseModel):
         if f'{index_name}_{index_type}' in indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
-            cls.__query(
+            cls._query(
                 'create_index',
                 [(index_name, index_type)],
                 background=background,
@@ -215,7 +217,7 @@ class MongoModel(DBMixin, BaseModel):
         for index in indexes:
             if f'{index_name}_' in index['name']:
                 drop = True
-                cls.__query('drop_index', index['name'])
+                cls._query('drop_index', index['name'])
         if drop:
             return f'{index_name} dropped.'
         raise MongoIndexError(f'invalid index name - {index_name}')
@@ -228,8 +230,8 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> int:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
-        return cls.__query('count', query, session=session, logical=bool(logical_query))
+            query = cls._check_query_args(logical_query)
+        return cls._query('count', query, session=session, logical=bool(logical_query))
 
     @classmethod
     def find_one(
@@ -241,9 +243,9 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> Any:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
+            query = cls._check_query_args(logical_query)
         sort_values = [(field, sort) for field in sort_fields]
-        data = cls.__query(
+        data = cls._query(
             'find_one',
             query,
             session=session,
@@ -267,8 +269,8 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> QuerySet:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
-        data = cls.__query('find', query, session=session, logical=bool(logical_query))
+            query = cls._check_query_args(logical_query)
+        data = cls._query('find', query, session=session, logical=bool(logical_query))
         if skip_rows is not None:
             data = data.skip(skip_rows)
         if limit_rows:
@@ -291,7 +293,7 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> tuple:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
+            query = cls._check_query_args(logical_query)
         count = cls.count(**query, session=session, logical_query=logical_query)
         results = cls.find(
             skip_rows=skip_rows,
@@ -307,7 +309,7 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def insert_one(cls, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = cls.parse_obj(query)
-        data = cls.__query('insert_one', obj.data, session=session)
+        data = cls._query('insert_one', obj.data, session=session)
         return data.inserted_id
 
     @classmethod
@@ -317,7 +319,7 @@ class MongoModel(DBMixin, BaseModel):
             if not isinstance(obj, ModelMetaclass):
                 obj = cls.parse_obj(obj)
             query.append(obj.data)
-        r = cls.__query('insert_many', query, session=session)
+        r = cls._query('insert_many', query, session=session)
         return len(r.inserted_ids)
 
     @classmethod
@@ -328,8 +330,8 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> int:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
-        r = cls.__query(
+            query = cls._check_query_args(logical_query)
+        r = cls._query(
             'delete_one', query, session=session, logical=bool(logical_query)
         )
         return r.deleted_count
@@ -343,8 +345,8 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> int:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
-        r = cls.__query(
+            query = cls._check_query_args(logical_query)
+        r = cls._query(
             'delete_many', query, session=session, logical=bool(logical_query)
         )
         return r.deleted_count
@@ -380,7 +382,7 @@ class MongoModel(DBMixin, BaseModel):
             raise AttributeError('not replacement parameters')
         filter_query = cls._validate_query_data(filter_query)
         replacement = cls._validate_query_data(replacement)
-        return cls.__query(
+        return cls._query(
             'replace_one',
             filter_query,
             replacement=replacement,
@@ -417,7 +419,7 @@ class MongoModel(DBMixin, BaseModel):
         session: Optional[ClientSession] = None,
     ) -> int:
         query, set_values = cls._ensure_update_data(**query)
-        r = cls.__query(
+        r = cls._query(
             method, query, {'$set': set_values}, upsert=upsert, session=session
         )
         return r.modified_count
@@ -443,7 +445,7 @@ class MongoModel(DBMixin, BaseModel):
             {"$match": query},
             {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
         ]
-        result = cls.__query("aggregate", data, session=session)
+        result = cls._query("aggregate", data, session=session)
         return {r['_id']: r['count'] for r in result}
 
     @classmethod
@@ -464,7 +466,7 @@ class MongoModel(DBMixin, BaseModel):
             },
         ]
 
-        result = cls.__query("aggregate", data, session=session)
+        result = cls._query("aggregate", data, session=session)
         return list(result)
 
     @classmethod
@@ -513,7 +515,7 @@ class MongoModel(DBMixin, BaseModel):
             {"$group": {"_id": None, **aggregate_query}},
         ]
         try:
-            result = cls.__query("aggregate", data, session=session).next()
+            result = cls._query("aggregate", data, session=session).next()
             return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
         except StopIteration:
             return {
@@ -568,7 +570,7 @@ class MongoModel(DBMixin, BaseModel):
             {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
         ]
         try:
-            return cls.__query("aggregate", data, session=session).next()["total"]
+            return cls._query("aggregate", data, session=session).next()["total"]
         except StopIteration:
             return 0
 
@@ -589,7 +591,7 @@ class MongoModel(DBMixin, BaseModel):
         **query,
     ) -> QuerySet:
         if logical_query:
-            query = cls.__check_query_args(logical_query)
+            query = cls._check_query_args(logical_query)
         else:
             query = cls._validate_query_data(query)
         lookup = {
@@ -613,7 +615,7 @@ class MongoModel(DBMixin, BaseModel):
             query_params.append({"$unwind": f'${lookup["$lookup"]["as"]}'})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
-        data = cls.__query(
+        data = cls._query(
             "aggregate", query_params, session=session, logical=bool(logical_query)
         )
         if skip_rows:
@@ -638,7 +640,7 @@ class MongoModel(DBMixin, BaseModel):
                     query_fields=query_fields,
                     upsert=upsert,
                 )
-                cls.__query('bulk_write', data, session=session)
+                cls._query('bulk_write', data, session=session)
             return None
         data = bulk_query_generator(
             models,
@@ -646,7 +648,7 @@ class MongoModel(DBMixin, BaseModel):
             query_fields=query_fields,
             upsert=upsert,
         )
-        cls.__query('bulk_write', data, session=session)
+        cls._query('bulk_write', data, session=session)
 
     @classmethod
     def bulk_update(
@@ -740,7 +742,7 @@ class MongoModel(DBMixin, BaseModel):
         if replacement:
             extra_params['replacement'] = replacement
 
-        data = cls.__query(operation, filter_, {'$set': set_values}, **extra_params)
+        data = cls._query(operation, filter_, {'$set': set_values}, **extra_params)
         if projection:
             return {
                 field: value for field, value in data.items() if field in projection
@@ -779,7 +781,7 @@ class MongoModel(DBMixin, BaseModel):
         session: Optional[ClientSession] = None,
         **query,
     ) -> Any:
-        if isinstance(replacement, BaseModel):
+        if isinstance(replacement, BasPydanticModel):
             replacement = replacement.data
         return cls._find_with_replacement_or_with_update(
             'find_and_replace',
@@ -795,13 +797,13 @@ class MongoModel(DBMixin, BaseModel):
     @classmethod
     def drop_collection(cls, force: bool = False) -> str:
         if force:
-            cls.__query('drop', query_params={})
+            cls._query('drop', query_params={})
             return f'{cls.__name__.lower()} - dropped!'
         value = input(
             f'Are u sure for drop this collection - {cls.__name__.lower()} (y, n)'
         )
         if value.lower() == 'y':
-            cls.__query('drop', query_params={})
+            cls._query('drop', query_params={})
             return f'{cls.__name__.lower()} - dropped!'
         return 'nope'
 
@@ -822,7 +824,7 @@ class MongoModel(DBMixin, BaseModel):
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
-        self.__query('delete_one', {'_id': ObjectId(self._id)}, session=session)
+        self._query('delete_one', {'_id': ObjectId(self._id)}, session=session)
 
     def _start_session(self) -> ClientSession:
         return self._Meta._connection._mongo_connection.start_session()
