@@ -34,7 +34,7 @@ class MongoQueryBuilderMixin(object):
     def _query(
         cls,
         method_name: str,
-        query_params: Union[List, Dict, str],
+        query_params: Union[List, Dict, str, Query, LogicalCombination],
         set_values: Optional[Dict] = None,
         session: Optional[ClientSession] = None,
         counter: int = 1,
@@ -42,10 +42,12 @@ class MongoQueryBuilderMixin(object):
         **kwargs,
     ) -> Any:
         inner_query_params = query_params
-        if isinstance(query_params, dict) and not logical:
+        if logical:
+            query_params = cls._check_query_args(query_params)
+        elif isinstance(query_params, dict):
             query_params = cls._validate_query_data(query_params)
-        collection = cls._collection
-        method = getattr(collection, method_name)
+
+        method = getattr(cls._collection, method_name)
         query = (query_params,)
         if session:
             kwargs['session'] = session
@@ -129,9 +131,12 @@ class MongoQueryBuilderMixin(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
-        return cls._query('count', query, session=session, logical=bool(logical_query))
+        return cls._query(
+            'count',
+            logical_query or query,
+            session=session,
+            logical=bool(logical_query),
+        )
 
     @classmethod
     def find_one(
@@ -142,12 +147,10 @@ class MongoQueryBuilderMixin(object):
         sort: int = 1,
         **query,
     ) -> Any:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
         sort_values = [(field, sort) for field in sort_fields]
         data = cls._query(
             'find_one',
-            query,
+            logical_query or query,
             session=session,
             logical=bool(logical_query),
             sort=sort_values,
@@ -168,9 +171,9 @@ class MongoQueryBuilderMixin(object):
         sort: int = 1,
         **query,
     ) -> QuerySet:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
-        data = cls._query('find', query, session=session, logical=bool(logical_query))
+        data = cls._query(
+            'find', logical_query or query, session=session, logical=bool(logical_query)
+        )
         if skip_rows is not None:
             data = data.skip(skip_rows)
         if limit_rows:
@@ -192,8 +195,7 @@ class MongoQueryBuilderMixin(object):
         sort: int = 1,
         **query,
     ) -> tuple:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
+
         count = cls.count(**query, session=session, logical_query=logical_query)
         results = cls.find(
             skip_rows=skip_rows,
@@ -214,11 +216,11 @@ class MongoQueryBuilderMixin(object):
 
     @classmethod
     def insert_many(cls, data: List, session: Optional[ClientSession] = None) -> int:
-        query = []
-        for obj in data:
-            if not isinstance(obj, ModelMetaclass):
-                obj = cls.parse_obj(obj)
-            query.append(obj.data)
+        parse_obj = cls.parse_obj
+        query = [
+            parse_obj(obj).data if isinstance(obj, ModelMetaclass) else obj.data
+            for obj in data
+        ]
         r = cls._query('insert_many', query, session=session)
         return len(r.inserted_ids)
 
@@ -229,10 +231,12 @@ class MongoQueryBuilderMixin(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
+
         r = cls._query(
-            'delete_one', query, session=session, logical=bool(logical_query)
+            'delete_one',
+            logical_query or query,
+            session=session,
+            logical=bool(logical_query),
         )
         return r.deleted_count
 
@@ -244,28 +248,29 @@ class MongoQueryBuilderMixin(object):
         *args,
         **query,
     ) -> int:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
+
         r = cls._query(
-            'delete_many', query, session=session, logical=bool(logical_query)
+            'delete_many',
+            logical_query or query,
+            session=session,
+            logical=bool(logical_query),
         )
         return r.deleted_count
 
     @classmethod
     def _ensure_update_data(cls, **fields) -> tuple:
         if not any("__set" in f for f in fields):
-            raise AttributeError("not fields for updating!")
+            raise ValueError("not fields for updating!")
         queries = {}
         set_values = {}
         for name, value in fields.items():
-            extra_fields = name.split("__")
-            if len(extra_fields) == 2:
-                if extra_fields[1] == "set":
-                    _dict = cls._validate_query_data({extra_fields[0]: value})
-                    set_values.update(_dict)
+            if name.endswith('__set'):
+                name = name.replace('__set', '')
+                data = cls._validate_query_data({name: value})
+                set_values.update(data)
             else:
-                _dict = cls._validate_query_data({name: value})
-                queries.update(_dict)
+                data = cls._validate_query_data({name: value})
+                queries.update(data)
         return queries, set_values
 
     @classmethod
@@ -280,12 +285,10 @@ class MongoQueryBuilderMixin(object):
             raise AttributeError('not filter parameters')
         if not replacement:
             raise AttributeError('not replacement parameters')
-        filter_query = cls._validate_query_data(filter_query)
-        replacement = cls._validate_query_data(replacement)
         return cls._query(
             'replace_one',
-            filter_query,
-            replacement=replacement,
+            cls._validate_query_data(filter_query),
+            replacement=cls._validate_query_data(replacement),
             upsert=upsert,
             session=session,
         )
@@ -340,9 +343,8 @@ class MongoQueryBuilderMixin(object):
     def aggregate_count(
         cls, agg_field: str, session: Optional[ClientSession] = None, **query,
     ) -> dict:
-        query = cls._validate_query_data(query)
         data = [
-            {"$match": query},
+            {"$match": cls._validate_query_data(query)},
             {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
         ]
         result = cls._query("aggregate", data, session=session)
@@ -355,9 +357,8 @@ class MongoQueryBuilderMixin(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> list:
-        query = cls._validate_query_data(query)
         data = [
-            {"$match": query},
+            {"$match": cls._validate_query_data(query)},
             {
                 "$group": {
                     "_id": {field: f'${field}' for field in agg_fields},
@@ -403,7 +404,6 @@ class MongoQueryBuilderMixin(object):
         if not operation and not fields_operations:
             raise ValidationError('miss operation or fields_operations')
 
-        query = cls._validate_query_data(query)
         aggregate_query = {
             f'{f}__{generate_operator_for_multiply_aggregations(f, operation, fields_operations)}': {
                 f"${generate_operator_for_multiply_aggregations(f, operation, fields_operations)}": f"${f}"
@@ -411,7 +411,7 @@ class MongoQueryBuilderMixin(object):
             for f in agg_fields
         }
         data = [
-            {"$match": query},
+            {"$match": cls._validate_query_data(query)},
             {"$group": {"_id": None, **aggregate_query}},
         ]
         try:
@@ -464,9 +464,8 @@ class MongoQueryBuilderMixin(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> Union[int, QuerySet]:
-        query = cls._validate_query_data(query)
         data = [
-            {"$match": query},
+            {"$match": cls._validate_query_data(query)},
             {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
         ]
         try:
@@ -490,10 +489,6 @@ class MongoQueryBuilderMixin(object):
         with_unwing: bool = False,
         **query,
     ) -> QuerySet:
-        if logical_query:
-            query = cls._check_query_args(logical_query)
-        else:
-            query = cls._validate_query_data(query)
         lookup = {
             "$lookup": {
                 "localField": local_field,
@@ -506,7 +501,11 @@ class MongoQueryBuilderMixin(object):
             cls, from_collection, lookup["$lookup"]["as"]
         )
         query_params = [
-            {'$match': query},
+            {
+                '$match': cls._check_query_args(logical_query)
+                if logical_query
+                else cls._validate_query_data(query)
+            },
             lookup,
             {'$project': project_param},
             {'$sort': {sf: sort for sf in sort_fields}},
@@ -627,10 +626,7 @@ class MongoQueryBuilderMixin(object):
         sort = [(field, sort) for field in sort_fields]
         replacement = query.pop('replacement', None)
 
-        if projection_fields:
-            projection = {f: True for f in projection_fields}
-        else:
-            projection = None
+        projection = {f: True for f in projection_fields} if projection_fields else None
         extra_params = {
             'return_document': return_document,
             'projection': projection,
