@@ -168,3 +168,16 @@ def generate_operator_for_multiply_aggregations(
     if operator:
         return operator
     return fields_operations[field]
+
+
+class cached_classproperty(object):
+    def __init__(self, fget):
+        self.obj = {}
+        self.fget = fget
+
+    def __get__(self, owner, cls):
+        if cls in self.obj:
+            return self.obj[cls]
+        self.obj[cls] = self.fget(cls)
+        return self.obj[cls]
+

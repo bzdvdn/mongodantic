@@ -44,7 +44,7 @@ class MongoQueryBuilderMixin(object):
         inner_query_params = query_params
         if isinstance(query_params, dict) and not logical:
             query_params = cls._validate_query_data(query_params)
-        collection = cls._get_collection()
+        collection = cls._collection
         method = getattr(collection, method_name)
         query = (query_params,)
         if session:

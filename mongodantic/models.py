@@ -16,6 +16,7 @@ from .helpers import ExtraQueryMapper
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .querybuilder import MongoQueryBuilderMixin
+from .helpers import cached_classproperty
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
@@ -39,7 +40,15 @@ class BaseModel(DBMixin, BasePydanticModel):
     @classmethod
     def _get_collection(cls) -> Collection:
         db = cls.get_database()
-        return db.get_collection(cls.set_collection_name())
+        return db.get_collection(cls._collection_name)
+
+    @cached_classproperty
+    def _collection_name(cls):
+        return cls.set_collection_name()
+
+    @cached_classproperty
+    def _collection(cls):
+        return cls._get_collection()
 
     @classmethod
     def parse_obj(
