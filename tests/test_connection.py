@@ -1,14 +1,14 @@
 import unittest
 import os
 from mongodantic import init_db_connection_params
-from mongodantic.db import DBConnection
+from mongodantic.db import _DBConnection
 from pymongo import MongoClient
 
 
 class TestWriteConnectionParams(unittest.TestCase):
     def setUp(self):
         init_db_connection_params("mongodb://127.0.0.1:27017", "test")
-        self.connection = DBConnection()
+        self.connection = _DBConnection()
 
     def test_connection_params(self):
         db_name = os.environ.get("MONGODANTIC_DBNAME")

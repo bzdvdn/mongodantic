@@ -4,7 +4,7 @@ from bson import ObjectId
 from pydantic.main import ModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
 
-from .mixins import DBMixin
+from .db import DBConnectionMixin
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
@@ -20,7 +20,7 @@ from .querybuilder import MongoQueryBuilderMixin
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
-class BaseModel(DBMixin, MongoQueryBuilderMixin, BasePydanticModel):
+class BaseModel(DBConnectionMixin, MongoQueryBuilderMixin, BasePydanticModel):
     _id: ObjectIdStr = None
 
     class Config:
