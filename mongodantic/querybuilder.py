@@ -47,7 +47,7 @@ class MongoQueryBuilderMixin(object):
         elif isinstance(query_params, dict):
             query_params = cls._validate_query_data(query_params)
 
-        method = getattr(cls._collection, method_name)
+        method = getattr(cls.collection, method_name)
         query = (query_params,)
         if session:
             kwargs['session'] = session

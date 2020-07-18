@@ -1,5 +1,4 @@
 from typing import TYPE_CHECKING, Dict, Any, Union, Optional
-from pymongo.collection import Collection
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
@@ -16,12 +15,12 @@ from .helpers import ExtraQueryMapper
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .querybuilder import MongoQueryBuilderMixin
-from .helpers import cached_classproperty
+
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
-class BaseModel(DBMixin, BasePydanticModel):
+class BaseModel(DBMixin, MongoQueryBuilderMixin, BasePydanticModel):
     _id: ObjectIdStr = None
 
     class Config:
@@ -32,23 +31,6 @@ class BaseModel(DBMixin, BasePydanticModel):
             return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
-
-    @classmethod
-    def set_collection_name(cls) -> str:
-        return cls.__name__.lower()
-
-    @classmethod
-    def _get_collection(cls) -> Collection:
-        db = cls.get_database()
-        return db.get_collection(cls._collection_name)
-
-    @cached_classproperty
-    def _collection_name(cls):
-        return cls.set_collection_name()
-
-    @cached_classproperty
-    def _collection(cls):
-        return cls._get_collection()
 
     @classmethod
     def parse_obj(
@@ -130,7 +112,7 @@ class BaseModel(DBMixin, BasePydanticModel):
             cls.__fields__ = new_sort
 
 
-class MongoModel(BaseModel, MongoQueryBuilderMixin):
+class MongoModel(BaseModel):
     def save(self, session: Optional[ClientSession] = None) -> Any:
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
