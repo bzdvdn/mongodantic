@@ -10,7 +10,7 @@ class TestLogicalQuery(unittest.TestCase):
             name: str
             position: int
 
-        Ticket.drop_collection(force=True)
+        Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
     def test_query_organization(self):
@@ -34,17 +34,17 @@ class TestLogicalQuery(unittest.TestCase):
             self.Ticket(name='first', position=1),
             self.Ticket(name='second', position=2),
         ]
-        inserted = self.Ticket.insert_many(query)
+        inserted = self.Ticket.querybuilder.insert_many(query)
         assert inserted == 2
 
         query = Query(name='first') | Query(position=1) & Query(name='second')
-        data = self.Ticket.find_one(query)
+        data = self.Ticket.querybuilder.find_one(query)
         assert data.name == 'first'
 
         query = Query(position=3) | Query(position=1) & Query(name='second')
-        data = self.Ticket.find_one(query)
+        data = self.Ticket.querybuilder.find_one(query)
         assert data is None
 
         query = Query(position=3) | Query(position=2) & Query(name='second')
-        data = self.Ticket.find_one(query)
+        data = self.Ticket.querybuilder.find_one(query)
         assert data.name == 'second'

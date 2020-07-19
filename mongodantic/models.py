@@ -118,19 +118,32 @@ class MongoModel(BaseModel):
             data = {'_id': ObjectId(self._id)}
             for field in self.__fields__:
                 data[f'{field}__set'] = getattr(self, field)
-            self.update_one(**data, session=session)
+            self.querybuilder.update_one(**data, session=session)
             return self
         data = {
             field: value
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = self.insert_one(**data, session=session)
+        object_id = self.querybuilder.insert_one(**data, session=session)
         self._id = object_id.__str__()
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
-        self._query('delete_one', {'_id': ObjectId(self._id)}, session=session)
+        self.querybuilder.delete_one(_id=ObjectId(self._id), session=session)
 
     def drop(self, session: Optional[ClientSession] = None) -> None:
         return self.delete(session)
+
+    @property
+    def data(self) -> Dict:
+        return self.dict()
+
+    def serialize(self, fields: Union[tuple, list]) -> dict:
+        data = self.dict(include=set(fields))
+        return {f: data[f] for f in fields}
+
+    def __hash__(self):
+        if self._id is None:
+            raise TypeError("MongoModel instances without _id value are unhashable")
+        return hash(self.pk)

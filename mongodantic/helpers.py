@@ -180,4 +180,3 @@ class cached_classproperty(object):
             return self.obj[cls]
         self.obj[cls] = self.fget(cls)
         return self.obj[cls]
-

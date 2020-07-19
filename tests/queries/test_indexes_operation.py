@@ -15,19 +15,19 @@ class TestIndexOperation(unittest.TestCase):
             position: int
             config: dict
 
-        Ticket.drop_collection(force=True)
+        Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
     def test_add_index(self):
-        result = self.Ticket.add_index('position', 1)
+        result = self.Ticket.querybuilder.add_index('position', 1)
         assert result == 'index with name - position created.'
 
         with pytest.raises(MongoIndexError):
-            result = self.Ticket.add_index('position', 1)
+            result = self.Ticket.querybuilder.add_index('position', 1)
 
     def test_check_indexes(self):
         self.test_add_index()
-        result = self.Ticket.check_indexes()
+        result = self.Ticket.querybuilder.check_indexes()
         assert result == [
             {'name': '_id_', 'key': {'_id': 1}},
             {'name': 'position_1', 'key': {'position': 1}},
@@ -36,7 +36,7 @@ class TestIndexOperation(unittest.TestCase):
     def test_drop_index(self):
         self.test_add_index()
         with pytest.raises(MongoIndexError):
-            result = self.Ticket.drop_index('position1')
+            result = self.Ticket.querybuilder.drop_index('position1')
 
-        result = self.Ticket.drop_index('position')
+        result = self.Ticket.querybuilder.drop_index('position')
         assert result == 'position dropped.'
