@@ -39,81 +39,81 @@ class Banner(MongoModel):
 
 ## Queries
 ```python
-banner = Banner.find_one() # return a banner model obj
+banner = Banner.querybuilder.find_one() # return a banner model obj
 # skip and limit
-banner_with_skip_and_limit = Banner.find(skip_rows=10, limit_rows=10)
-banner_data = Banner.find_one().data # return a dict
-banners_queryset= Banner.find() # return QuerySet object
-banners_dict = Banner.find().data
-list_of_banners = Banner.find().list
-banners_generator = Banner.find().generator # generator of Banner objects
-banners_generator_of_dicts = Banner.find().data_generator # generator of Banner objects
-count, banners = Banner.find_with_count() # return tuple(int, QuerySet)
+banner_with_skip_and_limit = Banner.querybuilder.find(skip_rows=10, limit_rows=10)
+banner_data = Banner.querybuilder.find_one().data # return a dict
+banners_queryset= Banner.querybuilder.find() # return QuerySet object
+banners_dict = Banner.querybuilder.find().data
+list_of_banners = Banner.querybuilder.find().list
+banners_generator = Banner.querybuilder.find().generator # generator of Banner objects
+banners_generator_of_dicts = Banner.querybuilder.find().data_generator # generator of Banner objects
+count, banners = Banner.querybuilder.find_with_count() # return tuple(int, QuerySet)
 
 # count
-count = Banner.count(name='test')
+count = Banner.querybuilder.count(name='test')
 
 # insert queries
-Banner.insert_one(banner_id=1, name='test', utm={'utm_source': 'yandex', 'utm_campaign': 'cpc'})
+Banner.querybuilder.insert_one(banner_id=1, name='test', utm={'utm_source': 'yandex', 'utm_campaign': 'cpc'})
 
 banners = [Banner(banner_id=2, name='test2', utm={}), Banner(banner_id=3, name='test3', utm={})]
-Banner.insert_many(banners) # list off models obj, or dicts
+Banner.querybuilder.insert_many(banners) # list off models obj, or dicts
 
 # update queries
-Banner.update_one(banner_id=1, name__set='updated') # parameters that end __set - been updated  
-Banner.update_many(name__set='update all names')
+Banner.querybuilder.update_one(banner_id=1, name__set='updated') # parameters that end __set - been updated  
+Banner.querybuilder.update_many(name__set='update all names')
 
 # delete queries
-Banner.delete_one(banner_id=1) # delete one row
-Banner.delete_many(banner_id=1) # delete many rows
+Banner.querybuilder.delete_one(banner_id=1) # delete one row
+Banner.querybuilder.delete_many(banner_id=1) # delete many rows
 
 # extra queries
-Banner.find(banner_id__in=[1, 2]) # get data in list
+Banner.querybuilder.find(banner_id__in=[1, 2]) # get data in list
 
-Banner.find(banner_id__range=[1,10]) # get date from 1 to 10
+Banner.querybuilder.find(banner_id__range=[1,10]) # get date from 1 to 10
 
-Banner.find(name__regex='^test') # regex query
+Banner.querybuilder.find(name__regex='^test') # regex query
 
-Banner.find(name__startswith='t') # startswith query
+Banner.querybuilder.find(name__startswith='t') # startswith query
 
-Banner.find(name__endswith='t') # endswith query
-Banner.find(name__not_startswith='t') # not startswith query
+Banner.querybuilder.find(name__endswith='t') # endswith query
+Banner.querybuilder.find(name__not_startswith='t') # not startswith query
 
-Banner.find(name__not_endswith='t') # not endswith query
+Banner.querybuilder.find(name__not_endswith='t') # not endswith query
 
 
-Banner.find(name__nin=[1, 2]) # not in list
+Banner.querybuilder.find(name__nin=[1, 2]) # not in list
 
-Banner.find(name__ne='test') # != test
+Banner.querybuilder.find(name__ne='test') # != test
 
-Banner.find(banner_id__gte=1, banner_id__lte=10) # id >=1 and id <=10
-Banner.find(banner_id__gt=1, banner_id__lt=10) # id >1 and id <10
+Banner.querybuilder.find(banner_id__gte=1, banner_id__lte=10) # id >=1 and id <=10
+Banner.querybuilder.find(banner_id__gt=1, banner_id__lt=10) # id >1 and id <10
 
 # find and update
-Banner.find_and_update(banner_id=1, name__set='updated', projection_fields=['name': True]) # return {'name': 'updated}
-Banner.find_and_update(banner_id=1, name__set='updated') # return Banner obj
+Banner.querybuilder.find_and_update(banner_id=1, name__set='updated', projection_fields=['name': True]) # return {'name': 'updated}
+Banner.querybuilder.find_and_update(banner_id=1, name__set='updated') # return Banner obj
 
 
 # find and replace
-Banner.find_and_update(banner_id=1, Banner(banner_id=1, name='uptated'), projection={'name': True})
+Banner.querybuilder.find_and_update(banner_id=1, Banner(banner_id=1, name='uptated'), projection={'name': True})
 # return {'name': 'updated}
-Banner.find_and_update(banner_id=1, Banner(banner_id=1, name='uptated')) # return Banner obj
+Banner.querybuilder.find_and_update(banner_id=1, Banner(banner_id=1, name='uptated')) # return Banner obj
 
 
 # bulk operations
 from random import randint
-banners = Banner.find()
+banners = Banner.querybuilder.find()
 to_update = []
 for banner in banners:
     banner.banner_id = randint(1,100)
     to_update.append(banner)
 
-Banner.bulk_update(banners, updated_fields=['banner_id'])
+Banner.querybuilder.bulk_update(banners, updated_fields=['banner_id'])
 
 # bulk update or create
 
 banners = [Banner(banner_id=23, name='new', utms={}), Banner(banner_id=1, name='test', utms={})]
-Banner.bulk_update_or_create(banners, query_fields=['banner_id'])
+Banner.querybuilder.bulk_update_or_create(banners, query_fields=['banner_id'])
 
 # aggregate with sum, min, max
 class Stats(MongoModel):
@@ -123,18 +123,18 @@ class Stats(MongoModel):
     shows: int
     date: str
 
-Stats.aggregate_sum(date='2020-01-20', agg_field='cost')
-Stats.aggregate_min(date='2020-01-20', agg_field='clicks')
-Stats.aggregate_max(date='2020-01-20', agg_field='shows')
+Stats.querybuilder.aggregate_sum(date='2020-01-20', agg_field='cost')
+Stats.querybuilder.aggregate_min(date='2020-01-20', agg_field='clicks')
+Stats.querybuilder.aggregate_max(date='2020-01-20', agg_field='shows')
 
 # sessions
 from mongodantic.session import Session
 with Session(Banner) as session:
-    Banner.find(skip_rows=1, limit_rows=1, session=session).data
+    Banner.querybuilder.find(skip_rows=1, limit_rows=1, session=session).data
 
 
 # logical
 from mongodantic.logical import Query
-data = Banner.find_one(Query(name='test') | Query(name__regex='testerino'))
+data = Banner.querybuilder.find_one(Query(name='test') | Query(name__regex='testerino'))
 
 ```

@@ -661,15 +661,16 @@ class MongoQueryBuilder(object):
         )
 
     def drop_collection(self, force: bool = False) -> str:
+        drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'
         if force:
             self._query('drop', query_params={})
-            return f'{self._mongo_model.__name__.lower()} - dropped!'
+            return drop_message
         value = input(
             f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'
         )
         if value.lower() == 'y':
             self._query('drop', query_params={})
-            return f'{self._mongo_model.__name__.lower()} - dropped!'
+            return drop_message
         return 'nope'
 
 
