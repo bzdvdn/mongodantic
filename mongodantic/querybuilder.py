@@ -30,7 +30,7 @@ from .logical import LogicalCombination, Query
 from .helpers import cached_classproperty
 
 
-class MongoQueryBuilder(object):
+class QueryBuilder(object):
     def __init__(self):
         self._mongo_model = None
 
@@ -674,9 +674,9 @@ class MongoQueryBuilder(object):
         return 'nope'
 
 
-class MongoQueryBuilderMixin(object):
+class QueryBuilderMixin(object):
     @cached_classproperty
     def querybuilder(cls):
-        querybuilder = MongoQueryBuilder()
+        querybuilder = QueryBuilder()
         querybuilder.add_model(cls)
         return querybuilder

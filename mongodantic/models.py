@@ -14,13 +14,13 @@ from .exceptions import (
 from .helpers import ExtraQueryMapper
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
-from .querybuilder import MongoQueryBuilderMixin
+from .querybuilder import QueryBuilderMixin
 
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
-class BaseModel(DBConnectionMixin, MongoQueryBuilderMixin, BasePydanticModel):
+class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
     _id: ObjectIdStr = None
 
     class Config:
