@@ -139,11 +139,15 @@ class MongoModel(BaseModel):
     def data(self) -> Dict:
         return self.dict()
 
+    @property
+    def pk(self):
+        return self._id
+
     def serialize(self, fields: Union[tuple, list]) -> dict:
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
 
     def __hash__(self):
-        if self._id is None:
+        if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
