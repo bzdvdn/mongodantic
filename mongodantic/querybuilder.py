@@ -548,6 +548,19 @@ class QueryBuilder(object):
             session=session,
         )
 
+    def bulk_create(
+        self,
+        models: List,
+        batch_size: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+    ) -> int:
+        if batch_size is None or batch_size <= 0:
+            batch_size = 30000
+        result = 0
+        for data in chunk_by_length(models, batch_size):
+            result += self.insert_many(data, session=session)
+        return result
+
     def bulk_update_or_create(
         self,
         models: List,
