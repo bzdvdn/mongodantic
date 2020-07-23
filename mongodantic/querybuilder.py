@@ -330,8 +330,11 @@ class QueryBuilder(object):
         return self._update('update_many', query, upsert=upsert, session=session)
 
     def aggregate_count(
-        self, agg_field: str, session: Optional[ClientSession] = None, **query,
+        self, session: Optional[ClientSession] = None, **query,
     ) -> dict:
+        agg_field = query.pop('agg_field', None)
+        if not agg_field:
+            raise ValueError('miss agg_field')
         data = [
             {"$match": self._mongo_model._validate_query_data(query)},
             {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},

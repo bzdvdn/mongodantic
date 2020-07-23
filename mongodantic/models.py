@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass

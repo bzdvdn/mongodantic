@@ -1,6 +1,5 @@
 from bson import ObjectId
 from bson.errors import InvalidId
-from pydantic import BaseModel
 
 
 class ObjectIdStr(str):

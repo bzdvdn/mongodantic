@@ -1,12 +1,14 @@
 import copy
 import warnings
+from pydantic.main import ModelMetaclass
+
 from .helpers import ExtraQueryMapper
 from .exceptions import DuplicateQueryParamError
 
 __all__ = ("Query", "LogicalCombination")
 
 
-def parse_query(model: any, query: dict) -> dict:
+def parse_query(model: ModelMetaclass, query: dict) -> dict:
     return model._validate_query_data(query)
 
 
@@ -26,7 +28,6 @@ class QueryNodeVisitor(object):
 
 
 class SimplificationVisitor(QueryNodeVisitor):
-
     def __init__(self, model=None):
         self.model = model
 
@@ -141,9 +142,9 @@ class LogicalCombination(QueryNode):
 
     def __eq__(self, other):
         return (
-                self.__class__ == other.__class__
-                and self.operation == other.operation
-                and self.children == other.children
+            self.__class__ == other.__class__
+            and self.operation == other.operation
+            and self.children == other.children
         )
 
 
