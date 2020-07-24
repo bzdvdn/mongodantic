@@ -11,11 +11,6 @@ class ObjectIdStr(str):
     validate_always = False
     alias = ''
 
-    # def __init__(self, *args):
-    #     if kwargs:
-    #         self.alias = args[0]
-    #     super().__init__()
-
     @classmethod
     def __get_validators__(cls):
         yield cls.validate
