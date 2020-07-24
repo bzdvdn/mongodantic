@@ -129,7 +129,7 @@ Stats.querybuilder.aggregate_max(date='2020-01-20', agg_field='shows')
 
 # sessions
 from mongodantic.session import Session
-with Session(Banner) as session:
+with Session() as session:
     Banner.querybuilder.find(skip_rows=1, limit_rows=1, session=session).data
 
 

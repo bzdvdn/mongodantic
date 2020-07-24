@@ -3,6 +3,7 @@ from bson import ObjectId
 
 from mongodantic.models import MongoModel
 from mongodantic import init_db_connection_params
+from mongodantic.session import Session
 
 
 class TestBasicOperation(unittest.TestCase):
@@ -123,3 +124,18 @@ class TestBasicOperation(unittest.TestCase):
         ticket.delete()
         data = self.Ticket.querybuilder.find_one(name='first')
         assert data is None
+
+    def test_session(self):
+        self.test_insert_one()
+        with Session() as session:
+            result = self.Ticket.querybuilder.find_one(name='first', session=session)
+        assert result.name == 'first'
+
+    # def test_session_with_transaction(self):
+
+    #     with Session() as session:
+    #         with session.start_transaction():
+    #             result = self.Ticket.querybuilder.insert_one(
+    #                 name='last', position=33333, config={}, session=session
+    #             )
+    #     assert result.name == 'first'

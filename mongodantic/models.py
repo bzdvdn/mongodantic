@@ -102,8 +102,9 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
             raise InvalidArgsParams()
         return logical_query.to_query(cls)
 
-    def _start_session(self) -> ClientSession:
-        return self._Meta._connection._mongo_connection.start_session()
+    @classmethod
+    def _start_session(cls) -> ClientSession:
+        return cls._connection._mongo_connection.start_session()
 
     @classmethod
     def sort_fields(cls, fields: Union[tuple, list, None]) -> None:

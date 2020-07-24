@@ -38,8 +38,8 @@ class _DBConnection(object):
             maxPoolSize=self.max_pool_size,
             connectTimeoutMS=self.connect_timeout_ms,
             socketTimeoutMS=self.socket_timeout_ms,
-            retryWrites=True,
-            retryReads=True,
+            retryWrites=False,
+            retryReads=False,
         )
         if self.ssl:
             connection_params['tlsCAFile'] = self.ssl_cert_path
