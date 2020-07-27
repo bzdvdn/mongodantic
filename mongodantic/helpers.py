@@ -1,6 +1,7 @@
 from re import compile
 from typing import List, Any, Dict, Tuple, Union, Optional, Callable
 from pydantic import BaseModel as BasePydanticModel
+from pydantic.main import ModelMetaclass
 from bson import ObjectId
 from pymongo import UpdateOne
 from pymongo.errors import (
@@ -171,7 +172,7 @@ def generate_lookup_project_params(
 
 
 def generate_operator_for_multiply_aggregations(
-    field: str, operator: Optional[str] = None, fields_operations: Optional[dict] = None
+    field: str, operator: Optional[str], fields_operations: Optional[dict]
 ) -> str:
     if operator:
         return operator

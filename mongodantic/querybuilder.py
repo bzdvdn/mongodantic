@@ -610,7 +610,7 @@ class QueryBuilder(object):
     ) -> Any:
         filter_, set_values = self._ensure_update_data(**query)
         return_document = ReturnDocument.AFTER
-        sort = [(field, sort) for field in sort_fields]
+        sort_value = [(field, sort) for field in sort_fields]
         replacement = query.pop('replacement', None)
 
         projection = {f: True for f in projection_fields} if projection_fields else None
@@ -618,7 +618,7 @@ class QueryBuilder(object):
             'return_document': return_document,
             'projection': projection,
             'upsert': upsert,
-            'sort': sort,
+            'sort': sort_value,
             'session': session,
         }
 

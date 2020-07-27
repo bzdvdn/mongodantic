@@ -30,6 +30,7 @@ class _DBConnection(object):
             os.environ.get('MONGODANTIC_SOCKET_TIMEOUT_MS', 60000)
         )
         self._mongo_connection = self.__init_mongo_connection()
+        self._database = None
 
     def __init_mongo_connection(self) -> MongoClient:
         connection_params = dict(
@@ -51,7 +52,7 @@ class _DBConnection(object):
         return self
 
     def get_database(self) -> database.Database:
-        if hasattr(self, '_database'):
+        if hasattr(self, '_database') and self._database:
             return self._database
         self._database = self._mongo_connection.get_database(self.db_name)
         return self._database
