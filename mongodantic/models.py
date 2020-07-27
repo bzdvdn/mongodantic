@@ -112,6 +112,19 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
             new_sort = {field: cls.__fields__[field] for field in fields}
             cls.__fields__ = new_sort
 
+    @property
+    def data(self) -> Dict:
+        return self.dict()
+
+    @property
+    def pk(self):
+        return self._id
+
+    def __hash__(self):
+        if self.pk is None:
+            raise TypeError("MongoModel instances without _id value are unhashable")
+        return hash(self.pk)
+
 
 class MongoModel(BaseModel):
     def save(self, session: Optional[ClientSession] = None) -> Any:
@@ -136,19 +149,6 @@ class MongoModel(BaseModel):
     def drop(self, session: Optional[ClientSession] = None) -> None:
         return self.delete(session)
 
-    @property
-    def data(self) -> Dict:
-        return self.dict()
-
-    @property
-    def pk(self):
-        return self._id
-
     def serialize(self, fields: Union[tuple, list]) -> dict:
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
-
-    def __hash__(self):
-        if self.pk is None:
-            raise TypeError("MongoModel instances without _id value are unhashable")
-        return hash(self.pk)
