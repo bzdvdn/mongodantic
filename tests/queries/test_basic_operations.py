@@ -49,9 +49,11 @@ class TestBasicOperation(unittest.TestCase):
     def test_find_one(self):
         self.test_insert_one()
         data = self.Ticket.querybuilder.find_one(name='first')
+        second = self.Ticket.querybuilder.find_one(_id=data._id)
         assert isinstance(data, MongoModel)
         assert data.name == 'first'
         assert data.position == 1
+        assert second._id == data._id
 
     def test_find(self):
         self.test_insert_many()

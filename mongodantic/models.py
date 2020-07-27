@@ -21,7 +21,7 @@ __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
 class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
-    _id: Optional[None] = None
+    _id: Optional[ObjectIdStr] = None
 
     class Config:
         excluded_query_fields = ()
