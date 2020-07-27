@@ -24,7 +24,7 @@ class LookupCombination(object):
         for node in self.children:
             query.extend(node.to_query())
             reference_models[node.as_] = node.from_collection
-        project = generate_lookup_project_params(main_model, reference_models)
+        project = {'$project': generate_lookup_project_params(main_model, reference_models)}
         query.append(project)
         return query
 
