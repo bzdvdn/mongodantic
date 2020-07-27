@@ -161,13 +161,14 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
 
 
 def generate_lookup_project_params(
-    main_model: ModelMetaclass, reference_model: ModelMetaclass, as_: str
+    main_model: ModelMetaclass, reference_models: Dict[str, ModelMetaclass]
 ) -> Dict:
     project_param = {f: 1 for f in main_model.__fields__}
     project_param['_id'] = 1
-    project_param.update(
-        {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())}
-    )
+    for as_, reference_model in reference_models.items():
+        project_param.update(
+            {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())}
+        )
     return project_param
 
 

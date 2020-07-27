@@ -1,18 +1,32 @@
 from typing import Optional
 from pydantic.main import ModelMetaclass
 
+from .helpers import generate_lookup_project_params
+
 
 class LookupCombination(object):
     def __init__(self, lookup):
         self.children = []
         for node in lookup:
-            if isinstance(node, LookupCombination):
+            if node in self.children:
+                continue
+            elif isinstance(node, LookupCombination):
                 self.children.extend(node.children)
             else:
                 self.children.append(node)
 
     def __repr__(self):
         return " AND ".join([repr(node) for node in self.children])
+
+    def accept(self, main_model: ModelMetaclass):
+        query = []
+        reference_models = {}
+        for node in self.children:
+            query.extend(node.to_query())
+            reference_models[node.as_] = node.from_collection
+        project = generate_lookup_project_params(main_model, reference_models)
+        query.append(project)
+        return query
 
 
 class Lookup(object):
@@ -28,7 +42,7 @@ class Lookup(object):
         self.from_collection = from_collection
         self.local_field = local_field
         self.foreign_field = foreign_field
-        self._as = as_ if as_ else self.from_collection.__name__.lower()
+        self.as_ = as_ if as_ else self.from_collection.collection_name
         self.unwind_path = unwind_path
         self.preserve_null_and_empty_arrays = preserve_null_and_empty_arrays
 
@@ -37,7 +51,7 @@ class Lookup(object):
             {
                 '$lookup': {
                     'localField': self._validate_local_field(),
-                    'from': self.from_collection,
+                    'from': self.from_collection.collection_name,
                     'foreignField': self.foreign_field,
                     'as': self.as_,
                 }
@@ -56,7 +70,7 @@ class Lookup(object):
 
     def _validate_local_field(self) -> str:
         if (
-            self.local_field not in self.from_collection.__fields___
+            self.local_field not in self.from_collection.__fields__
             and self.local_field != '_id'
         ):
             raise AttributeError('invalid local_field')
@@ -64,6 +78,9 @@ class Lookup(object):
 
     def _combine(self, other) -> LookupCombination:
         return LookupCombination([self, other])
+
+    def accept(self, main_model: ModelMetaclass):
+        return LookupCombination([self]).accept(main_model)
 
     def __and__(self, other):
         return self._combine(other)
