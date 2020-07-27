@@ -38,7 +38,7 @@ class QueryBuilder(object):
         if not self._mongo_model:
             self._mongo_model = mongo_model
 
-    def _query(
+    def __query(
         self,
         method_name: str,
         query_params: Union[List, Dict, str, Query, LogicalCombination],
@@ -75,7 +75,7 @@ class QueryBuilder(object):
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
-            return self._query(
+            return self.__query(
                 method_name=method_name,
                 query_params=inner_query_params,
                 set_values=set_values,
@@ -86,7 +86,7 @@ class QueryBuilder(object):
             )
 
     def check_indexes(self) -> List:
-        index_list = list(self._query('list_indexes', {}))
+        index_list = list(self.__query('list_indexes', {}))
         return_list = []
         for index in index_list:
             d = dict(index)
@@ -106,7 +106,7 @@ class QueryBuilder(object):
         if f'{index_name}_{index_type}' in indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
-            self._query(
+            self.__query(
                 'create_index',
                 [(index_name, index_type)],
                 background=background,
@@ -123,7 +123,7 @@ class QueryBuilder(object):
         for index in indexes:
             if f'{index_name}_' in index['name']:
                 drop = True
-                self._query('drop_index', index['name'])
+                self.__query('drop_index', index['name'])
         if drop:
             return f'{index_name} dropped.'
         raise MongoIndexError(f'invalid index name - {index_name}')
@@ -134,7 +134,7 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        return self._query(
+        return self.__query(
             'count',
             logical_query or query,
             session=session,
@@ -150,7 +150,7 @@ class QueryBuilder(object):
         **query,
     ) -> Any:
         sort_values = [(field, sort) for field in sort_fields]
-        data = self._query(
+        data = self.__query(
             'find_one',
             logical_query or query,
             session=session,
@@ -172,7 +172,7 @@ class QueryBuilder(object):
         sort: int = 1,
         **query,
     ) -> QuerySet:
-        data = self._query(
+        data = self.__query(
             'find', logical_query or query, session=session, logical=bool(logical_query)
         )
         if skip_rows is not None:
@@ -210,7 +210,7 @@ class QueryBuilder(object):
 
     def insert_one(self, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = self._mongo_model.parse_obj(query)
-        data = self._query('insert_one', obj.data, session=session)
+        data = self.__query('insert_one', obj.data, session=session)
         return data.inserted_id
 
     def insert_many(self, data: List, session: Optional[ClientSession] = None) -> int:
@@ -219,7 +219,7 @@ class QueryBuilder(object):
             parse_obj(obj).data if isinstance(obj, ModelMetaclass) else obj.data
             for obj in data
         ]
-        r = self._query('insert_many', query, session=session)
+        r = self.__query('insert_many', query, session=session)
         return len(r.inserted_ids)
 
     def delete_one(
@@ -229,7 +229,7 @@ class QueryBuilder(object):
         **query,
     ) -> int:
 
-        r = self._query(
+        r = self.__query(
             'delete_one',
             logical_query or query,
             session=session,
@@ -245,7 +245,7 @@ class QueryBuilder(object):
         **query,
     ) -> int:
 
-        r = self._query(
+        r = self.__query(
             'delete_many',
             logical_query or query,
             session=session,
@@ -279,7 +279,7 @@ class QueryBuilder(object):
             raise AttributeError('not filter parameters')
         if not replacement:
             raise AttributeError('not replacement parameters')
-        return self._query(
+        return self.__query(
             'replace_one',
             self._mongo_model._validate_query_data(filter_query),
             replacement=self._mongo_model._validate_query_data(replacement),
@@ -302,9 +302,8 @@ class QueryBuilder(object):
                 raw_query = list(map(self._mongo_model._validate_query_data, raw_query))
             else:
                 raw_query = self._mongo_model._validate_query_data(raw_query)
-        collection = self._get_collection()
-        query = getattr(collection, method_name)
-        return query(raw_query, session=session)
+        query = getattr(self._mongo_model.collection, method_name)
+        return self.__query(raw_query, session=session)
 
     def _update(
         self,
@@ -314,7 +313,7 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
     ) -> int:
         query, set_values = self._ensure_update_data(**query)
-        r = self._query(
+        r = self.__query(
             method, query, {'$set': set_values}, upsert=upsert, session=session
         )
         return r.modified_count
@@ -339,7 +338,7 @@ class QueryBuilder(object):
             {"$match": self._mongo_model._validate_query_data(query)},
             {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
         ]
-        result = self._query("aggregate", data, session=session)
+        result = self.__query("aggregate", data, session=session)
         return {r['_id']: r['count'] for r in result}
 
     def aggregate_multiply_count(
@@ -358,7 +357,7 @@ class QueryBuilder(object):
             },
         ]
 
-        result = self._query("aggregate", data, session=session)
+        result = self.__query("aggregate", data, session=session)
         return list(result)
 
     def aggregate_multiply_math_operations(
@@ -404,7 +403,7 @@ class QueryBuilder(object):
             {"$group": {"_id": None, **aggregate_query}},
         ]
         try:
-            result = self._query("aggregate", data, session=session).next()
+            result = self.__query("aggregate", data, session=session).next()
             return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
         except StopIteration:
             return {
@@ -454,7 +453,7 @@ class QueryBuilder(object):
             {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
         ]
         try:
-            return self._query("aggregate", data, session=session).next()["total"]
+            return self.__query("aggregate", data, session=session).next()["total"]
         except StopIteration:
             return 0
 
@@ -498,7 +497,7 @@ class QueryBuilder(object):
             query_params.append({"$unwind": f'${lookup["$lookup"]["as"]}'})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
-        data = self._query(
+        data = self.__query(
             "aggregate", query_params, session=session, logical=bool(logical_query)
         )
         if skip_rows:
@@ -522,7 +521,7 @@ class QueryBuilder(object):
                     query_fields=query_fields,
                     upsert=upsert,
                 )
-                self._query('bulk_write', data, session=session)
+                self.__query('bulk_write', data, session=session)
             return None
         data = bulk_query_generator(
             models,
@@ -530,7 +529,7 @@ class QueryBuilder(object):
             query_fields=query_fields,
             upsert=upsert,
         )
-        self._query('bulk_write', data, session=session)
+        self.__query('bulk_write', data, session=session)
 
     def bulk_update(
         self,
@@ -626,7 +625,7 @@ class QueryBuilder(object):
         if replacement:
             extra_params['replacement'] = replacement
 
-        data = self._query(operation, filter_, {'$set': set_values}, **extra_params)
+        data = self.__query(operation, filter_, {'$set': set_values}, **extra_params)
         if projection:
             return {
                 field: value for field, value in data.items() if field in projection
@@ -679,13 +678,13 @@ class QueryBuilder(object):
     def drop_collection(self, force: bool = False) -> str:
         drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'
         if force:
-            self._query('drop', query_params={})
+            self.__query('drop', query_params={})
             return drop_message
         value = input(
             f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'
         )
         if value.lower() == 'y':
-            self._query('drop', query_params={})
+            self.__query('drop', query_params={})
             return drop_message
         return 'nope'
 
