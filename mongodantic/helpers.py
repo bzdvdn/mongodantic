@@ -1,6 +1,6 @@
 from re import compile
 from typing import List, Any, Dict, Tuple, Union, Optional, Callable
-from pydantic.main import ModelMetaclass
+from pydantic import BaseModel as BasePydanticModel
 from bson import ObjectId
 from pymongo import UpdateOne
 from pymongo.errors import (

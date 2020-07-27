@@ -71,7 +71,7 @@ class QueryBuilder(object):
             WriteConcernError,
             ServerSelectionTimeoutError,
         ) as description:
-            self._reconnect()
+            self._mongo_model._reconnect()
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
@@ -196,7 +196,7 @@ class QueryBuilder(object):
         **query,
     ) -> tuple:
 
-        count = self.count(**query, session=session, logical_query=logical_query)
+        count = self.count(session=session, logical_query=logical_query, **query,)
         results = self.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,
@@ -303,7 +303,7 @@ class QueryBuilder(object):
             else:
                 raw_query = self._mongo_model._validate_query_data(raw_query)
         query = getattr(self._mongo_model.collection, method_name)
-        return self.__query(raw_query, session=session)
+        return query(raw_query, session=session)
 
     def _update(
         self,
@@ -447,7 +447,7 @@ class QueryBuilder(object):
         agg_field: str,
         session: Optional[ClientSession] = None,
         **query,
-    ) -> Union[int, QuerySet]:
+    ) -> int:
         data = [
             {"$match": self._mongo_model._validate_query_data(query)},
             {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
@@ -485,7 +485,7 @@ class QueryBuilder(object):
         )
         query_params = [
             {
-                '$match': self._check_query_args(logical_query)
+                '$match': self._mongo_model._check_query_args(logical_query)
                 if logical_query
                 else self._mongo_model._validate_query_data(query)
             },
@@ -662,7 +662,7 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> Any:
-        if isinstance(replacement, BasePydanticModel):
+        if not isinstance(replacement, dict):
             replacement = replacement.data
         return self._find_with_replacement_or_with_update(
             'find_and_replace',
