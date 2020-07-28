@@ -5,6 +5,7 @@ from random import randint
 from mongodantic.models import MongoModel
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
+from mongodantic.lookup import Lookup
 
 product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
@@ -108,20 +109,21 @@ class TestAggregation(unittest.TestCase):
             url='http://localhost:8000/image.png',
             product_id=ObjectId(product_inserted_id),
         )
-
         product = self.Product.querybuilder.aggregate_lookup(
-            local_field='_id',
-            from_collection=self.ProductImage,
-            foreign_field='product_id',
+            lookup=Lookup(
+                self.ProductImage, local_field='_id', foreign_field='product_id',
+            ),
             title='product1',
         ).first()
 
         assert str(product.productimage[0].product_id) == str(product_inserted_id)
 
         image = self.ProductImage.querybuilder.aggregate_lookup(
-            local_field='product_id',
-            from_collection=self.Product,
-            foreign_field='_id',
-            with_unwing=True,
+            lookup=Lookup(
+                local_field='product_id',
+                from_collection=self.Product,
+                foreign_field='_id',
+                with_unwind=True,
+            )
         ).first()
         assert str(image.product._id) == str(product_inserted_id)

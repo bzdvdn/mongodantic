@@ -22,12 +22,12 @@ from .exceptions import (
 from .helpers import (
     chunk_by_length,
     bulk_query_generator,
-    generate_lookup_project_params,
     generate_operator_for_multiply_aggregations,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .helpers import cached_classproperty
+from .lookup import Lookup, LookupCombination
 
 
 class QueryBuilder(object):
@@ -459,42 +459,28 @@ class QueryBuilder(object):
 
     def aggregate_lookup(
         self,
-        local_field: str,
-        from_collection: ModelMetaclass,
-        foreign_field: Optional[str] = None,
-        as_: Optional[str] = None,
         logical_query: Union[Query, LogicalCombination, None] = None,
+        lookup: Union[Lookup, LookupCombination, None] = None,
+        project: Optional[dict] = None,
+        sort_fields: Union[tuple, list] = ('_id',),
+        sort: int = 1,
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
-        sort: int = 1,
-        with_unwing: bool = False,
         **query,
-    ) -> QuerySet:
-        lookup = {
-            "$lookup": {
-                "localField": local_field,
-                "from": from_collection.__name__.lower(),
-                "foreignField": foreign_field if foreign_field else "_id",
-                "as": as_ if as_ else from_collection.__name__.lower(),
-            }
-        }
-        project_param = generate_lookup_project_params(
-            self._mongo_model, from_collection, lookup["$lookup"]["as"]
-        )
+    ) -> Union[QuerySet, list]:
+        if not lookup:
+            raise ValueError('invalid lookup param')
         query_params = [
             {
                 '$match': self._mongo_model._check_query_args(logical_query)
                 if logical_query
                 else self._mongo_model._validate_query_data(query)
-            },
-            lookup,
-            {'$project': project_param},
-            {'$sort': {sf: sort for sf in sort_fields}},
+            }
         ]
-        if with_unwing:
-            query_params.append({"$unwind": f'${lookup["$lookup"]["as"]}'})
+        accepted_lookup, reference_models = lookup.accept(self._mongo_model, project)
+        query_params.extend(accepted_lookup)
+        query_params.append({'$sort': {sf: sort for sf in sort_fields}})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
         data = self.__query(
@@ -502,7 +488,9 @@ class QueryBuilder(object):
         )
         if skip_rows:
             data = data.skip(skip_rows)
-        return QuerySet(self._mongo_model, data, reference_model=from_collection)
+        if project:
+            return list(data)
+        return QuerySet(self._mongo_model, data, list(reference_models.values()))
 
     def _bulk_operation(
         self,

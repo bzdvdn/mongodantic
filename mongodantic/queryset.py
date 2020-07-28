@@ -10,16 +10,16 @@ class QuerySet(object):
         self,
         model: ModelMetaclass,
         data: Generator,
-        reference_model: Optional[ModelMetaclass] = None,
+        reference_models: Optional[List[ModelMetaclass]] = None,
     ):
         self._data = data
         self._model = model
-        self._reference_model = reference_model
+        self._reference_models = reference_models
 
     @handle_and_convert_connection_errors
     def __iter__(self):
         for obj in self._data:
-            yield self._model.parse_obj(obj, self._reference_model)
+            yield self._model.parse_obj(obj, self._reference_models)
 
     @property
     def data(self) -> List:

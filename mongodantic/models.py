@@ -1,4 +1,4 @@
-from typing import Dict, Any, Union, Optional
+from typing import Dict, Any, Union, Optional, List
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
@@ -34,25 +34,26 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
 
     @classmethod
     def parse_obj(
-        cls, data: Any, reference_model: Optional[ModelMetaclass] = None
+        cls, data: Any, reference_models: Optional[List[ModelMetaclass]] = None,
     ) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = data['_id']
-        if reference_model:
-            obj = cls.__set_reference_fields(obj, data, reference_model)
+        if reference_models:
+            obj = cls.__set_reference_fields(obj, data, reference_models)
         return obj
 
     @classmethod
     def __set_reference_fields(
-        cls, obj: ModelMetaclass, data: Dict, ref: ModelMetaclass
+        cls, obj: ModelMetaclass, data: Dict, reference_models: List[ModelMetaclass]
     ) -> ModelMetaclass:
-        data = data[ref.__name__.lower()]
-        if isinstance(data, dict):
-            ref_obj = ref.parse_obj(data)
-        else:
-            ref_obj = [ref.parse_obj(d) for d in data]
-        setattr(obj, f'{ref.__name__.lower()}', ref_obj)
+        for ref in reference_models:
+            data = data[ref.__name__.lower()]
+            if isinstance(data, dict):
+                ref_obj = ref.parse_obj(data)
+            else:
+                ref_obj = [ref.parse_obj(d) for d in data]
+            setattr(obj, f'{ref.__name__.lower()}', ref_obj)
         return obj
 
     @classmethod
