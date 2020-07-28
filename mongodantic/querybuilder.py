@@ -27,7 +27,7 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .helpers import cached_classproperty
-from .lookup import Lookup, LookupCombination
+from .aggregation import Lookup, LookupCombination
 
 
 class QueryBuilder(object):

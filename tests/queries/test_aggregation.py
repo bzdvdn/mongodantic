@@ -5,7 +5,7 @@ from random import randint
 from mongodantic.models import MongoModel
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
-from mongodantic.lookup import Lookup
+from mongodantic.aggregation import Lookup
 
 product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
