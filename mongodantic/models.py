@@ -45,15 +45,18 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
 
     @classmethod
     def __set_reference_fields(
-        cls, obj: ModelMetaclass, data: Dict, reference_models: List[ModelMetaclass]
+        cls,
+        obj: ModelMetaclass,
+        data: Dict,
+        reference_models: Dict[str, ModelMetaclass],
     ) -> ModelMetaclass:
-        for ref in reference_models:
-            data = data[ref.__name__.lower()]
+        for name_as, ref in reference_models.items():
+            data = data[name_as]
             if isinstance(data, dict):
                 ref_obj = ref.parse_obj(data)
             else:
                 ref_obj = [ref.parse_obj(d) for d in data]
-            setattr(obj, f'{ref.__name__.lower()}', ref_obj)
+            setattr(obj, f'{name_as}', ref_obj)
         return obj
 
     @classmethod

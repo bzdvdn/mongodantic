@@ -490,7 +490,7 @@ class QueryBuilder(object):
             data = data.skip(skip_rows)
         if project:
             return list(data)
-        return QuerySet(self._mongo_model, data, list(reference_models.values()))
+        return QuerySet(self._mongo_model, data, reference_models)
 
     def _bulk_operation(
         self,
