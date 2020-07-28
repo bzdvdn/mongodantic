@@ -127,3 +127,16 @@ class TestAggregation(unittest.TestCase):
             )
         ).first()
         assert str(image.product._id) == str(product_inserted_id)
+
+        product = self.Product.querybuilder.aggregate_lookup(
+            lookup=Lookup(
+                self.ProductImage,
+                local_field='_id',
+                foreign_field='product_id',
+                as_='image',
+                with_unwind=True,
+            ),
+            title='product1',
+            project={'_id': 1, 'title': 1, 'cost': 1, 'image_id': '$image._id'},
+        )[0]
+        assert str(product['image_id']) == str(image_inserted_id)

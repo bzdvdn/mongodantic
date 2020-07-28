@@ -27,10 +27,8 @@ class LookupCombination(object):
             accepted_lookup.extend(node.to_query(main_model))
             reference_models[node.as_] = node.from_collection
         if not project:
-            project = {
-                '$project': generate_lookup_project_params(main_model, reference_models)
-            }
-        accepted_lookup.append(project)
+            project = generate_lookup_project_params(main_model, reference_models)
+        accepted_lookup.append({'$project': project})
         return accepted_lookup, reference_models
 
 
