@@ -1,7 +1,19 @@
 from typing import Optional
 from pydantic.main import ModelMetaclass
 
+from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
+
+
+class BasicAggregationOperation(object):
+    def __init__(self, model: ModelMetaclass, agg_field: str):
+        self._model = model
+        self.agg_field = self._validate_agg_field(agg_field)
+
+    def _validate_agg_field(self, agg_field: str) -> str:
+        if not agg_field in self._model.__fields__ and agg_field != '_id':
+            raise ValidationError(f'this agg_field: "{agg_field}" not in model field')
+        return agg_field
 
 
 class LookupCombination(object):
@@ -95,3 +107,4 @@ class Lookup(object):
 
     def __repr__(self):
         return f'Lookup(from_collection={self.from_collection.__name__.lower()}, local_field={self.local_field}, foreign_field={self.foreign_field}, as={self.as_}'
+
