@@ -5,19 +5,8 @@ from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
 
 
-class BasicAggregationOperation(object):
-    def __init__(self, model: ModelMetaclass, agg_field: str):
-        self._model = model
-        self.agg_field = self._validate_agg_field(agg_field)
-
-    def _validate_agg_field(self, agg_field: str) -> str:
-        if not agg_field in self._model.__fields__ and agg_field != '_id':
-            raise ValidationError(f'this agg_field: "{agg_field}" not in model field')
-        return agg_field
-
-
 class LookupCombination(object):
-    def __init__(self, lookup):
+    def __init__(self, lookup: list):
         self.children = []
         for node in lookup:
             if node in self.children:

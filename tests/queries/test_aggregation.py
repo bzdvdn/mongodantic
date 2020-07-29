@@ -50,6 +50,9 @@ class TestAggregation(unittest.TestCase):
         sum_ = self.Product.querybuilder.aggregate_sum(agg_field='cost')
         assert sum_ == 10
 
+        avg_ = self.Product.querybuilder.aggregate_avg(agg_field='cost')
+        assert avg_ == 2.5
+
     def test_aggregation_multiply(self):
         data = [
             self.Product(
@@ -76,11 +79,16 @@ class TestAggregation(unittest.TestCase):
         )
         assert result_min == {'cost__min': 1.0, 'quantity__min': 0}
 
-        result_multiply = self.Product.querybuilder.aggregate_multiply_math_operations(
-            agg_fields=['cost', 'quantity'],
-            fields_operations={'cost': 'sum', 'quantity': 'max'},
+        result_avg = self.Product.querybuilder.aggregate_avg_multiply(
+            agg_fields=['cost', 'quantity']
         )
-        assert result_multiply == {'cost__sum': 10.0, 'quantity__max': 3}
+        assert result_avg == {'cost__avg': 2.5, 'quantity__avg': 1.5}
+
+        result_multiply = self.Product.querybuilder.aggregate_multiply_operations(
+            agg_fields=['cost', 'quantity',],
+            fields_operations={'cost': 'avg', 'quantity': 'max'},
+        )
+        assert result_multiply == {'cost__avg': 2.5, 'quantity__max': 3}
 
         result_count = self.Product.querybuilder.aggregate_count(
             agg_field='product_type'

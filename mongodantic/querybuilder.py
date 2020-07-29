@@ -360,7 +360,7 @@ class QueryBuilder(object):
         result = self.__query("aggregate", data, session=session)
         return list(result)
 
-    def aggregate_multiply_math_operations(
+    def aggregate_multiply_operations(
         self,
         agg_fields: Union[list, tuple],
         fields_operations: dict,
@@ -370,7 +370,7 @@ class QueryBuilder(object):
         for f in agg_fields:
             if f not in fields_operations:
                 raise ValidationError(f'{f} not in fields_operations')
-            elif fields_operations[f] not in ('sum', 'max', 'min'):
+            elif fields_operations[f] not in ('sum', 'max', 'min', 'avg'):
                 raise ValidationError(
                     f'{fields_operations[f]} invalid aggregation operation'
                 )
@@ -419,6 +419,16 @@ class QueryBuilder(object):
     ):
         return self._aggregate_multiply_math_operations(
             operation='sum', agg_fields=agg_fields, session=session, **query
+        )
+
+    def aggregate_avg_multiply(
+        self,
+        agg_fields: Union[tuple, list],
+        session: Optional[ClientSession] = None,
+        **query,
+    ):
+        return self._aggregate_multiply_math_operations(
+            operation='avg', agg_fields=agg_fields, session=session, **query
         )
 
     def aggregate_max_multiply(
@@ -570,6 +580,13 @@ class QueryBuilder(object):
     ) -> int:
         return self._aggregate_math_operation(
             'sum', agg_field, session=session, **query
+        )
+
+    def aggregate_avg(
+        self, agg_field: str, session: Optional[ClientSession] = None, **query
+    ) -> int:
+        return self._aggregate_math_operation(
+            'avg', agg_field, session=session, **query
         )
 
     def aggregate_max(
