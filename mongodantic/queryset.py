@@ -1,3 +1,4 @@
+from json import dumps
 from typing import Generator, List, Optional, Union
 from pydantic.main import ModelMetaclass
 
@@ -26,6 +27,10 @@ class QuerySet(object):
         return [obj.data for obj in self.__iter__()]
 
     @property
+    def json(self) -> str:
+        return dumps(self.data)
+
+    @property
     def generator(self) -> Generator:
         return self.__iter__()
 
@@ -46,3 +51,6 @@ class QuerySet(object):
     def serialize_generator(self, fields: Union[tuple, List]) -> Generator:
         for obj in self.__iter__():
             yield obj.serialize(fields)
+
+    def serialize_json(self, fields: Union[tuple, List]) -> str:
+        return dumps(self.serialize(fields))

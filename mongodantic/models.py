@@ -1,3 +1,4 @@
+from json import dumps
 from typing import Dict, Any, Union, Optional, List
 from pymongo.client_session import ClientSession
 from bson import ObjectId
@@ -156,3 +157,6 @@ class MongoModel(BaseModel):
     def serialize(self, fields: Union[tuple, list]) -> dict:
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
+
+    def serialize_json(self, fields: Union[tuple, list]) -> dict:
+        return dumps(self.serialize(fields))
