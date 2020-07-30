@@ -117,11 +117,30 @@ class QueryBuilder(object):
         except Exception as e:
             raise MongoIndexError(f'detail: {str(e)}')
 
-    def drop_index(self, index_name: str) -> str:
+    def add_compound_index(self, **indexes) -> dict:
+        if not indexes:
+            raise ValueError('miss indexes')
+        index_name = f'_'.join(f'{name}_{type_}' for name, type_ in indexes)
+        db_indexes = [index['name'] for index in self.check_indexes()]
+        if f'{index_name}_{index_type}' in db_indexes:
+            raise MongoIndexError(f'{index_name} - already exists.')
+        try:
+            self.__query(
+                'create_index',
+                [(index_name, index_type) for index_name, index_type in indexes],
+                background=background,
+                unique=unique,
+                sparse=sparse,
+            )
+            return f'index with name - {index_name} created.'
+        except Exception as e:
+            raise MongoIndexError(f'detail: {str(e)}')
+
+    def drop_index(self, index_name: str, index_type: int) -> str:
         indexes = self.check_indexes()
         drop = False
         for index in indexes:
-            if f'{index_name}_' in index['name']:
+            if f'{index_name}_{index_type}' in index['name']:
                 drop = True
                 self.__query('drop_index', index['name'])
         if drop:
