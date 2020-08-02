@@ -358,6 +358,7 @@ class QueryBuilder(object):
             {"$match": self._mongo_model._validate_query_data(query)},
             {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
         ]
+        print('=== 1 - ', data)
         result = self.__query("aggregate", data, session=session)
         return {r['_id']: r['count'] for r in result}
 
@@ -373,36 +374,15 @@ class QueryBuilder(object):
                 "$group": {
                     "_id": {field: f'${field}' for field in agg_fields},
                     "count": {"$sum": 1},
-                }
+                },
             },
         ]
 
         result = self.__query("aggregate", data, session=session)
         return list(result)
 
-    def aggregate_multiply_operations(
-        self,
-        agg_fields: Union[list, tuple],
-        fields_operations: dict,
-        session: Optional[ClientSession] = None,
-        **query,
-    ):
-        for f in agg_fields:
-            if f not in fields_operations:
-                raise ValidationError(f'{f} not in fields_operations')
-            elif fields_operations[f] not in ('sum', 'max', 'min', 'avg'):
-                raise ValidationError(
-                    f'{fields_operations[f]} invalid aggregation operation'
-                )
-        return self._aggregate_multiply_math_operations(
-            agg_fields=agg_fields,
-            fields_operations=fields_operations,
-            session=session,
-            **query,
-        )
-
     def aggregate(
-        self, aggregation: Union[list, tuple, BasicDefaultAggregation], **query
+        self, aggregation: Union[list, tuple, BasicDefaultAggregation], *args, **query
     ) -> dict:
         session = query.pop('session', None)
 
@@ -413,106 +393,25 @@ class QueryBuilder(object):
         else:
             aggregate_query = aggregation._aggregate_query(self._mongo_model)
         data = [
-            {"$match": self._mongo_model._validate_query_data(query)},
-            {"$group": {"_id": None, **aggregate_query}},
+            {"$match": self._mongo_model._validate_query_data(query)} if not args else self._mongo_model.__check_query_args(*args),
+            {
+                "$group": {"_id": None, **aggregate_query}
+                if '_id' not in aggregate_query
+                else aggregate_query
+            },
         ]
-        try:
-            result = self.__query("aggregate", data, session=session).next()
-            result.pop('_id', None)
-            return result
-        except StopIteration:
+        result = list(self.__query("aggregate", data, session=session))
+        if not result:
             if isinstance(aggregation, Iterable):
                 agg_fields = [f'{agg.field}__{agg._operation}' for agg in aggregation]
             else:
                 agg_fields = [f'{aggregation.field}__{aggregation._operation}']
             return {f: 0 for f in agg_fields}
-
-    def _aggregate_multiply_math_operations(
-        self,
-        agg_fields: Union[tuple, list],
-        operation: Optional[str] = None,
-        session: Optional[ClientSession] = None,
-        fields_operations: Optional[dict] = None,
-        **query,
-    ) -> dict:
-        if not operation and not fields_operations:
-            raise ValidationError('miss operation or fields_operations')
-
-        aggregate_query = {
-            f'{f}__{generate_operator_for_multiply_aggregations(f, operation, fields_operations)}': {
-                f"${generate_operator_for_multiply_aggregations(f, operation, fields_operations)}": f"${f}"
-            }
-            for f in agg_fields
-        }
-        print('==== ', aggregate_query)
-        data = [
-            {"$match": self._mongo_model._validate_query_data(query)},
-            {"$group": {"_id": None, **aggregate_query}},
-        ]
-        try:
-            result = self.__query("aggregate", data, session=session).next()
-            return {f: result[f] for f in result if f.split('__')[0] in agg_fields}
-        except StopIteration:
-            return {
-                f'{f}__{generate_operator_for_multiply_aggregations(f, operation, fields_operations)}': 0
-                for f in agg_fields
-            }
-
-    def aggregate_sum_multiply(
-        self,
-        agg_fields: Union[tuple, list],
-        session: Optional[ClientSession] = None,
-        **query,
-    ):
-        return self._aggregate_multiply_math_operations(
-            operation='sum', agg_fields=agg_fields, session=session, **query
-        )
-
-    def aggregate_avg_multiply(
-        self,
-        agg_fields: Union[tuple, list],
-        session: Optional[ClientSession] = None,
-        **query,
-    ):
-        return self._aggregate_multiply_math_operations(
-            operation='avg', agg_fields=agg_fields, session=session, **query
-        )
-
-    def aggregate_max_multiply(
-        self,
-        agg_fields: Union[tuple, list],
-        session: Optional[ClientSession] = None,
-        **query,
-    ):
-        return self._aggregate_multiply_math_operations(
-            operation='max', agg_fields=agg_fields, session=session, **query
-        )
-
-    def aggregate_min_multiply(
-        self,
-        agg_fields: Union[tuple, list],
-        session: Optional[ClientSession] = None,
-        **query,
-    ):
-        return self._aggregate_multiply_math_operations(
-            operation='min', agg_fields=agg_fields, session=session, **query
-        )
-
-    def _aggregate_math_operation(
-        self,
-        operation: str,
-        agg_field: str,
-        session: Optional[ClientSession] = None,
-        **query,
-    ) -> int:
-        data = [
-            {"$match": self._mongo_model._validate_query_data(query)},
-            {"$group": {"_id": None, "total": {f"${operation}": f"${agg_field}"}}},
-        ]
-        try:
-            return self.__query("aggregate", data, session=session).next()["total"]
-        except StopIteration:
-            return 0
+        result_data = {}
+        for r in result:
+            name = r.pop('_id')
+            result_data.update({name: r} if name else r)
+        return result_data
 
     def aggregate_lookup(
         self,
@@ -620,34 +519,6 @@ class QueryBuilder(object):
             batch_size=batch_size,
             upsert=True,
             session=session,
-        )
-
-    def aggregate_sum(
-        self, agg_field: str, session: Optional[ClientSession] = None, **query
-    ) -> int:
-        return self._aggregate_math_operation(
-            'sum', agg_field, session=session, **query
-        )
-
-    def aggregate_avg(
-        self, agg_field: str, session: Optional[ClientSession] = None, **query
-    ) -> int:
-        return self._aggregate_math_operation(
-            'avg', agg_field, session=session, **query
-        )
-
-    def aggregate_max(
-        self, agg_field: str, session: Optional[ClientSession] = None, **query
-    ) -> int:
-        return self._aggregate_math_operation(
-            'max', agg_field, session=session, **query
-        )
-
-    def aggregate_min(
-        self, agg_field: str, session: Optional[ClientSession] = None, **query
-    ) -> int:
-        return self._aggregate_math_operation(
-            'min', agg_field, session=session, **query
         )
 
     def _find_with_replacement_or_with_update(

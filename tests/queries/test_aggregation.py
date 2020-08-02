@@ -1,11 +1,13 @@
 import unittest
+import pytest
 from bson import ObjectId
 from random import randint
 
 from mongodantic.models import MongoModel
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
-from mongodantic.aggregation import Lookup, Sum, Max, Min, Avg
+from mongodantic.aggregation import Lookup, Sum, Max, Min, Avg, Count
+from mongodantic.exceptions import ValidationError
 
 product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
@@ -41,17 +43,17 @@ class TestAggregation(unittest.TestCase):
             for i in range(1, 5)
         ]
         self.Product.querybuilder.insert_many(data)
-        max_ = self.Product.querybuilder.aggregate_max(agg_field='cost')
-        assert max_ == 4
+        max_ = self.Product.querybuilder.aggregate(aggregation=Max('cost'))
+        assert max_ == {'cost__max': 4}
 
-        min_ = self.Product.querybuilder.aggregate_min(agg_field='cost')
-        assert min_ == 1
+        min_ = self.Product.querybuilder.aggregate(aggregation=Min('cost'))
+        assert min_ == {'cost__min': 1}
 
-        sum_ = self.Product.querybuilder.aggregate_sum(agg_field='cost')
-        assert sum_ == 10
+        sum_ = self.Product.querybuilder.aggregate(aggregation=Sum('cost'))
+        assert sum_ == {'cost__sum': 10}
 
-        avg_ = self.Product.querybuilder.aggregate_avg(agg_field='cost')
-        assert avg_ == 2.5
+        avg_ = self.Product.querybuilder.aggregate(aggregation=Avg('cost'))
+        assert avg_ == {'cost__avg': 2.5}
 
     def test_aggregation_multiply(self):
         data = [
@@ -59,51 +61,48 @@ class TestAggregation(unittest.TestCase):
                 title=str(i),
                 cost=float(i),
                 quantity=i - 1,
-                product_type=product_types[2],
+                product_type=product_types[2] if i != 4 else product_types[1],
             )
             for i in range(1, 5)
         ]
         self.Product.querybuilder.insert_many(data)
-        result_sum = self.Product.querybuilder.aggregate_sum_multiply(
-            agg_fields=['cost', 'quantity']
+        result_sum = self.Product.querybuilder.aggregate(
+            aggregation=[Sum('cost'), Sum('quantity')]
         )
         assert result_sum == {'cost__sum': 10.0, 'quantity__sum': 6}
 
-        result_max = self.Product.querybuilder.aggregate_max_multiply(
-            agg_fields=['cost', 'quantity']
+        result_max = self.Product.querybuilder.aggregate(
+            aggregation=[Max('cost'), Max('quantity')]
         )
         assert result_max == {'cost__max': 4.0, 'quantity__max': 3}
 
-        result_min = self.Product.querybuilder.aggregate_min_multiply(
-            agg_fields=['cost', 'quantity']
+        result_min = self.Product.querybuilder.aggregate(
+            aggregation=[Min('cost'), Min('quantity')]
         )
         assert result_min == {'cost__min': 1.0, 'quantity__min': 0}
 
-        result_avg = self.Product.querybuilder.aggregate_avg_multiply(
-            agg_fields=['cost', 'quantity']
+        result_avg = self.Product.querybuilder.aggregate(
+            aggregation=(Avg('cost'), Avg('quantity'))
         )
         assert result_avg == {'cost__avg': 2.5, 'quantity__avg': 1.5}
 
-        result_multiply = self.Product.querybuilder.aggregate_multiply_operations(
-            agg_fields=['cost', 'quantity',],
-            fields_operations={'cost': 'avg', 'quantity': 'max'},
+        result_multiply = self.Product.querybuilder.aggregate(
+            aggregation=(Avg('cost'), Max('quantity'))
         )
         assert result_multiply == {'cost__avg': 2.5, 'quantity__max': 3}
 
-        result_count = self.Product.querybuilder.aggregate_count(
-            agg_field='product_type'
+        result_count = self.Product.querybuilder.aggregate(
+            aggregation=Count('product_type')
         )
-        assert result_count == {'book': 4}
+        assert result_count == {'book': {'count': 3}, 'phone': {'count': 1}}
 
-        result_multiply_count = self.Product.querybuilder.aggregate_multiply_count(
-            agg_fields=['product_type', 'quantity']
+        result_count_agg = self.Product.querybuilder.aggregate(
+            aggregation=[Count('product_type'), Sum('cost')]
         )
-        assert result_multiply_count == [
-            {'_id': {'product_type': 'book', 'quantity': 3}, 'count': 1},
-            {'_id': {'product_type': 'book', 'quantity': 2}, 'count': 1},
-            {'_id': {'product_type': 'book', 'quantity': 0}, 'count': 1},
-            {'_id': {'product_type': 'book', 'quantity': 1}, 'count': 1},
-        ]
+        assert result_count_agg == {
+            'book': {'cost__sum': 6.0, 'count': 3},
+            'phone': {'cost__sum': 4.0, 'count': 1},
+        }
 
         result_agg = self.Product.querybuilder.aggregate(
             aggregation=[Avg('cost'), Max('quantity')]
@@ -114,6 +113,12 @@ class TestAggregation(unittest.TestCase):
             title='not_match', aggregation=[Avg('cost'), Max('quantity')]
         )
         assert result_not_match_agg == {'cost__avg': 0, 'quantity__max': 0}
+
+    def test_raises_invalid_field(self):
+        with pytest.raises(ValidationError):
+            self.Product.querybuilder.aggregate(
+                title='not_match', aggregation=[Avg('cost123'), Max('quantityzzzz')]
+            )
 
     def test_aggregate_lookup(self):
 

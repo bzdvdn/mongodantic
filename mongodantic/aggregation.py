@@ -17,7 +17,7 @@ class BasicDefaultAggregation(object):
         raise NotImplementedError('implement _operation')
 
     def _validate_field(self, mongo_model: ModelMetaclass):
-        if self.field not in mongo_model.__fields__:
+        if self.field not in mongo_model.__fields__ and self.field != '_id':
             raise ValidationError(
                 f'{self.field} not in {mongo_model.__name__} field, field must be one of {list(mongo_model.__fields__.keys())}'
             )
@@ -61,8 +61,12 @@ class Count(BasicDefaultAggregation):
     def _operation(self) -> str:
         return 'count'
 
-    def _aggregate_query(self) -> dict:
-        query = {f'{self.field}__{self._operation}': {f'$sum': f'${self.field}'}}
+    def _aggregate_query(self, mongo_model: ModelMetaclass) -> dict:
+        self._validate_field(mongo_model)
+        query = {
+            "_id": f'${self.field}' if self.field != '_id' else None,
+            f'count': {f'$sum': 1},
+        }
         return query
 
 
