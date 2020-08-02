@@ -5,6 +5,67 @@ from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
 
 
+__all__ = ('Lookup', 'LookupCombination')
+
+
+class BasicDefaultAggregation(object):
+    def __init__(self, field: str):
+        self.field = field
+
+    @property
+    def _operation(self) -> str:
+        raise NotImplementedError('implement _operation')
+
+    def _validate_field(self, mongo_model: ModelMetaclass):
+        if self.field not in mongo_model.__fields__:
+            raise ValidationError(
+                f'{self.field} not in {mongo_model.__name__} field, field must be one of {list(mongo_model.__fields__.keys())}'
+            )
+
+    def _aggregate_query(self, mongo_model: ModelMetaclass) -> dict:
+        self._validate_field(mongo_model)
+        query = {
+            f'{self.field}__{self._operation}': {
+                f'${self._operation}': f'${self.field}'
+            }
+        }
+        return query
+
+
+class Sum(BasicDefaultAggregation):
+    @property
+    def _operation(self) -> str:
+        return 'sum'
+
+
+class Max(BasicDefaultAggregation):
+    @property
+    def _operation(self) -> str:
+        return 'max'
+
+
+class Min(BasicDefaultAggregation):
+    @property
+    def _operation(self) -> str:
+        return 'min'
+
+
+class Avg(BasicDefaultAggregation):
+    @property
+    def _operation(self) -> str:
+        return 'avg'
+
+
+class Count(BasicDefaultAggregation):
+    @property
+    def _operation(self) -> str:
+        return 'count'
+
+    def _aggregate_query(self) -> dict:
+        query = {f'{self.field}__{self._operation}': {f'$sum': f'${self.field}'}}
+        return query
+
+
 class LookupCombination(object):
     def __init__(self, lookup: list):
         self.children = []

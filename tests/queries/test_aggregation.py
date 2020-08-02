@@ -5,7 +5,7 @@ from random import randint
 from mongodantic.models import MongoModel
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
-from mongodantic.aggregation import Lookup
+from mongodantic.aggregation import Lookup, Sum, Max, Min, Avg
 
 product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
@@ -104,6 +104,16 @@ class TestAggregation(unittest.TestCase):
             {'_id': {'product_type': 'book', 'quantity': 0}, 'count': 1},
             {'_id': {'product_type': 'book', 'quantity': 1}, 'count': 1},
         ]
+
+        result_agg = self.Product.querybuilder.aggregate(
+            aggregation=[Avg('cost'), Max('quantity')]
+        )
+        assert result_agg == {'cost__avg': 2.5, 'quantity__max': 3}
+
+        result_not_match_agg = self.Product.querybuilder.aggregate(
+            title='not_match', aggregation=[Avg('cost'), Max('quantity')]
+        )
+        assert result_not_match_agg == {'cost__avg': 0, 'quantity__max': 0}
 
     def test_aggregate_lookup(self):
 

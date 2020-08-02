@@ -1,4 +1,5 @@
 from typing import Union, List, Dict, Optional, Any
+from collections.abc import Iterable
 from pymongo.collection import Collection
 from pymongo import ReturnDocument
 from pymongo.client_session import ClientSession
@@ -27,7 +28,7 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .helpers import cached_classproperty
-from .aggregation import Lookup, LookupCombination
+from .aggregation import Lookup, LookupCombination, BasicDefaultAggregation
 
 
 class QueryBuilder(object):
@@ -381,6 +382,32 @@ class QueryBuilder(object):
             **query,
         )
 
+    def aggregate(
+        self, aggregation: Union[list, tuple, BasicDefaultAggregation], **query
+    ) -> dict:
+        session = query.pop('session', None)
+
+        if isinstance(aggregation, Iterable):
+            aggregate_query = {}
+            for agg in aggregation:
+                aggregate_query.update(agg._aggregate_query(self._mongo_model))
+        else:
+            aggregate_query = aggregation._aggregate_query(self._mongo_model)
+        data = [
+            {"$match": self._mongo_model._validate_query_data(query)},
+            {"$group": {"_id": None, **aggregate_query}},
+        ]
+        try:
+            result = self.__query("aggregate", data, session=session).next()
+            result.pop('_id', None)
+            return result
+        except StopIteration:
+            if isinstance(aggregation, Iterable):
+                agg_fields = [f'{agg.field}__{agg._operation}' for agg in aggregation]
+            else:
+                agg_fields = [f'{aggregation.field}__{aggregation._operation}']
+            return {f: 0 for f in agg_fields}
+
     def _aggregate_multiply_math_operations(
         self,
         agg_fields: Union[tuple, list],
@@ -398,6 +425,7 @@ class QueryBuilder(object):
             }
             for f in agg_fields
         }
+        print('==== ', aggregate_query)
         data = [
             {"$match": self._mongo_model._validate_query_data(query)},
             {"$group": {"_id": None, **aggregate_query}},
