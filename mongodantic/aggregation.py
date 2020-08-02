@@ -5,7 +5,7 @@ from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
 
 
-__all__ = ('Lookup', 'LookupCombination')
+__all__ = ('Lookup', 'LookupCombination', 'Sum', 'Avg', 'Min', 'Count', 'Max')
 
 
 class BasicDefaultAggregation(object):

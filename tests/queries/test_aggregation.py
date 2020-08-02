@@ -3,7 +3,7 @@ import pytest
 from bson import ObjectId
 from random import randint
 
-from mongodantic.models import MongoModel
+from mongodantic.models import MongoModel, Query
 from mongodantic.types import ObjectIdStr, ObjectId
 from mongodantic import init_db_connection_params
 from mongodantic.aggregation import Lookup, Sum, Max, Min, Avg, Count
@@ -110,7 +110,7 @@ class TestAggregation(unittest.TestCase):
         assert result_agg == {'cost__avg': 2.5, 'quantity__max': 3}
 
         result_not_match_agg = self.Product.querybuilder.aggregate(
-            title='not_match', aggregation=[Avg('cost'), Max('quantity')]
+            Query(title='not_match'), aggregation=[Avg('cost'), Max('quantity')]
         )
         assert result_not_match_agg == {'cost__avg': 0, 'quantity__max': 0}
 

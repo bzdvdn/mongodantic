@@ -28,7 +28,7 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .helpers import cached_classproperty
-from .aggregation import Lookup, LookupCombination, BasicDefaultAggregation
+from .aggregation import Lookup, LookupCombination
 
 
 class QueryBuilder(object):
@@ -348,39 +348,6 @@ class QueryBuilder(object):
     ) -> int:
         return self._update('update_many', query, upsert=upsert, session=session)
 
-    def aggregate_count(
-        self, session: Optional[ClientSession] = None, **query,
-    ) -> dict:
-        agg_field = query.pop('agg_field', None)
-        if not agg_field:
-            raise ValueError('miss agg_field')
-        data = [
-            {"$match": self._mongo_model._validate_query_data(query)},
-            {"$group": {"_id": f'${agg_field}', "count": {"$sum": 1}}},
-        ]
-        print('=== 1 - ', data)
-        result = self.__query("aggregate", data, session=session)
-        return {r['_id']: r['count'] for r in result}
-
-    def aggregate_multiply_count(
-        self,
-        agg_fields: Union[List, tuple],
-        session: Optional[ClientSession] = None,
-        **query,
-    ) -> list:
-        data = [
-            {"$match": self._mongo_model._validate_query_data(query)},
-            {
-                "$group": {
-                    "_id": {field: f'${field}' for field in agg_fields},
-                    "count": {"$sum": 1},
-                },
-            },
-        ]
-
-        result = self.__query("aggregate", data, session=session)
-        return list(result)
-
     def aggregate(self, *args, **query) -> dict:
         session = query.pop('session', None)
         aggregation = query.pop('aggregation', None)
@@ -393,9 +360,11 @@ class QueryBuilder(object):
         else:
             aggregate_query = aggregation._aggregate_query(self._mongo_model)
         data = [
-            {"$match": self._mongo_model._validate_query_data(query)}
-            if not args
-            else self._mongo_model.__check_query_args(*args),
+            {
+                "$match": self._mongo_model._validate_query_data(query)
+                if not args
+                else self._mongo_model._check_query_args(*args)
+            },
             {
                 "$group": {"_id": None, **aggregate_query}
                 if '_id' not in aggregate_query
