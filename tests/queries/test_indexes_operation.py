@@ -36,7 +36,7 @@ class TestIndexOperation(unittest.TestCase):
     def test_drop_index(self):
         self.test_add_index()
         with pytest.raises(MongoIndexError):
-            result = self.Ticket.querybuilder.drop_index('position1')
+            result = self.Ticket.querybuilder.drop_index('position1111', 1)
 
-        result = self.Ticket.querybuilder.drop_index('position')
+        result = self.Ticket.querybuilder.drop_index('position', 1)
         assert result == 'position dropped.'
