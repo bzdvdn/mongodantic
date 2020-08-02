@@ -381,11 +381,11 @@ class QueryBuilder(object):
         result = self.__query("aggregate", data, session=session)
         return list(result)
 
-    def aggregate(
-        self, aggregation: Union[list, tuple, BasicDefaultAggregation], *args, **query
-    ) -> dict:
+    def aggregate(self, *args, **query) -> dict:
         session = query.pop('session', None)
-
+        aggregation = query.pop('aggregation', None)
+        if not aggregation:
+            raise ValueError('miss aggregation')
         if isinstance(aggregation, Iterable):
             aggregate_query = {}
             for agg in aggregation:
@@ -393,7 +393,9 @@ class QueryBuilder(object):
         else:
             aggregate_query = aggregation._aggregate_query(self._mongo_model)
         data = [
-            {"$match": self._mongo_model._validate_query_data(query)} if not args else self._mongo_model.__check_query_args(*args),
+            {"$match": self._mongo_model._validate_query_data(query)}
+            if not args
+            else self._mongo_model.__check_query_args(*args),
             {
                 "$group": {"_id": None, **aggregate_query}
                 if '_id' not in aggregate_query
