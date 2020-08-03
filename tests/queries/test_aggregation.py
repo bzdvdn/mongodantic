@@ -104,6 +104,24 @@ class TestAggregation(unittest.TestCase):
             'phone': {'cost__sum': 4.0, 'count': 1},
         }
 
+        result_sum_and_avg_agg_with_group = self.Product.querybuilder.aggregate(
+            aggregation=[Avg('cost'), Sum('cost')], group_by=['product_type'],
+        )
+        assert result_sum_and_avg_agg_with_group == {
+            'phone': {'cost__avg': 4.0, 'cost__sum': 4.0},
+            'book': {'cost__avg': 2.0, 'cost__sum': 6.0},
+        }
+        result_sum_and_avg_agg_with_group_many = self.Product.querybuilder.aggregate(
+            aggregation=[Avg('cost'), Sum('cost')],
+            group_by=['product_type', 'quantity'],
+        )
+        assert result_sum_and_avg_agg_with_group_many == {
+            'book|0': {'cost__avg': 1.0, 'cost__sum': 1.0},
+            'book|1': {'cost__avg': 2.0, 'cost__sum': 2.0},
+            'book|2': {'cost__avg': 3.0, 'cost__sum': 3.0},
+            'phone|3': {'cost__avg': 4.0, 'cost__sum': 4.0},
+        }
+
         result_agg = self.Product.querybuilder.aggregate(
             aggregation=[Avg('cost'), Max('quantity')]
         )
@@ -112,7 +130,7 @@ class TestAggregation(unittest.TestCase):
         result_not_match_agg = self.Product.querybuilder.aggregate(
             Query(title='not_match'), aggregation=[Avg('cost'), Max('quantity')]
         )
-        assert result_not_match_agg == {'cost__avg': 0, 'quantity__max': 0}
+        assert result_not_match_agg == {}
 
     def test_raises_invalid_field(self):
         with pytest.raises(ValidationError):

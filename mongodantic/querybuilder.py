@@ -23,7 +23,7 @@ from .exceptions import (
 from .helpers import (
     chunk_by_length,
     bulk_query_generator,
-    generate_operator_for_multiply_aggregations,
+    generate_name_field,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
@@ -351,6 +351,7 @@ class QueryBuilder(object):
     def aggregate(self, *args, **query) -> dict:
         session = query.pop('session', None)
         aggregation = query.pop('aggregation', None)
+        group_by = query.pop('group_by', None)
         if not aggregation:
             raise ValueError('miss aggregation')
         if isinstance(aggregation, Iterable):
@@ -359,28 +360,33 @@ class QueryBuilder(object):
                 aggregate_query.update(agg._aggregate_query(self._mongo_model))
         else:
             aggregate_query = aggregation._aggregate_query(self._mongo_model)
+        if group_by:
+            group_by = (
+                {g: f'${g}' for g in group_by}
+                if isinstance(group_by, (list, tuple))
+                else f'${group_by}'
+            )
+            group_params = {"$group": {"_id": group_by, **aggregate_query}}
+        else:
+            group_params = {
+                "$group": {"_id": None, **aggregate_query}
+                if '_id' not in aggregate_query
+                else aggregate_query
+            }
         data = [
             {
                 "$match": self._mongo_model._validate_query_data(query)
                 if not args
                 else self._mongo_model._check_query_args(*args)
             },
-            {
-                "$group": {"_id": None, **aggregate_query}
-                if '_id' not in aggregate_query
-                else aggregate_query
-            },
+            group_params,
         ]
         result = list(self.__query("aggregate", data, session=session))
         if not result:
-            if isinstance(aggregation, Iterable):
-                agg_fields = [f'{agg.field}__{agg._operation}' for agg in aggregation]
-            else:
-                agg_fields = [f'{aggregation.field}__{aggregation._operation}']
-            return {f: 0 for f in agg_fields}
+            return {}
         result_data = {}
         for r in result:
-            name = r.pop('_id')
+            name = generate_name_field(r.pop('_id'))
             result_data.update({name: r} if name else r)
         return result_data
 

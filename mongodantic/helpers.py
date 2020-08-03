@@ -172,12 +172,10 @@ def generate_lookup_project_params(
     return project_param
 
 
-def generate_operator_for_multiply_aggregations(
-    field: str, operator: Optional[str], fields_operations: Optional[dict]
-) -> str:
-    if operator:
-        return operator
-    return fields_operations[field]
+def generate_name_field(name: Union[dict, str, None] = None):
+    if isinstance(name, dict):
+        return '|'.join(str(v) for v in name.values())
+    return name
 
 
 class cached_classproperty(object):
