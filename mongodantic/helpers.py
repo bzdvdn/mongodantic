@@ -1,7 +1,6 @@
 from re import compile
 from typing import List, Any, Dict, Tuple, Union, Optional, Callable
 from pydantic import BaseModel as BasePydanticModel
-from pydantic.main import ModelMetaclass
 from bson import ObjectId
 from pymongo import UpdateOne
 from pymongo.errors import (
@@ -35,7 +34,7 @@ class ExtraQueryMapper(object):
                 else ObjectId(values)
             )
         if extra_methods:
-            query = {self.field_name: {}}
+            query: Dict = {self.field_name: {}}
             for extra_method in extra_methods:
                 if extra_method == 'in':
                     extra_method = 'in_'
@@ -161,7 +160,7 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
 
 
 def generate_lookup_project_params(
-    main_model: ModelMetaclass, reference_models: Dict[str, ModelMetaclass]
+    main_model: BasePydanticModel, reference_models: Dict[str, BasePydanticModel]
 ) -> Dict:
     project_param = {f: 1 for f in main_model.__fields__}
     project_param['_id'] = 1

@@ -35,7 +35,7 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
 
     @classmethod
     def parse_obj(
-        cls, data: Any, reference_models: Optional[List[ModelMetaclass]] = None,
+        cls, data: Any, reference_models: Dict[Any, 'BaseModel'] = {},
     ) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
@@ -46,11 +46,8 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
 
     @classmethod
     def __set_reference_fields(
-        cls,
-        obj: ModelMetaclass,
-        data: Dict,
-        reference_models: Dict[str, ModelMetaclass],
-    ) -> ModelMetaclass:
+        cls, obj: 'BaseModel', data: Dict, reference_models: Dict[Any, 'BaseModel'],
+    ) -> 'BaseModel':
         for name_as, ref in reference_models.items():
             data = data[name_as]
             if isinstance(data, dict):
@@ -130,6 +127,9 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
 
+    def __name__(self):
+        return super().__name__()
+
 
 class MongoModel(BaseModel):
     def save(self, session: Optional[ClientSession] = None) -> Any:
@@ -158,5 +158,5 @@ class MongoModel(BaseModel):
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
 
-    def serialize_json(self, fields: Union[tuple, list]) -> dict:
+    def serialize_json(self, fields: Union[tuple, list]) -> str:
         return dumps(self.serialize(fields))

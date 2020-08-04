@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Generator, List, Optional, Union
+from typing import Generator, List, Optional, Union, Any
 from pydantic.main import ModelMetaclass
 
 
@@ -42,7 +42,7 @@ class QuerySet(object):
     def list(self) -> List:
         return list(self.__iter__())
 
-    def first(self) -> any:
+    def first(self) -> Any:
         return next(self.__iter__())
 
     def serialize(self, fields: Union[tuple, List]) -> List:

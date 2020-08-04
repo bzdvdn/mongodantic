@@ -56,11 +56,11 @@ class QueryBuilder(object):
             query_params = self._mongo_model._validate_query_data(query_params)
 
         method = getattr(self._mongo_model.collection, method_name)
-        query = (query_params,)
+        query = [query_params]
         if session:
             kwargs['session'] = session
         if set_values:
-            query = (query_params, set_values)
+            query = [query_params, set_values]
         try:
             if kwargs:
                 return method(*query, **kwargs)
@@ -118,17 +118,26 @@ class QueryBuilder(object):
         except Exception as e:
             raise MongoIndexError(f'detail: {str(e)}')
 
-    def add_compound_index(self, **indexes) -> dict:
+    def add_compound_index(
+        self,
+        background: bool = True,
+        unique: bool = False,
+        sparse: bool = False,
+        **indexes,
+    ) -> str:
         if not indexes:
             raise ValueError('miss indexes')
-        index_name = f'_'.join(f'{name}_{type_}' for name, type_ in indexes)
+        index_name = f'_'.join(f'{name}_{type_}' for name, type_ in indexes.items())
         db_indexes = [index['name'] for index in self.check_indexes()]
-        if f'{index_name}_{index_type}' in db_indexes:
+        if index_name in db_indexes:
             raise MongoIndexError(f'{index_name} - already exists.')
         try:
             self.__query(
                 'create_index',
-                [(index_name, index_type) for index_name, index_type in indexes],
+                [
+                    (index_name, index_type)
+                    for index_name, index_type in indexes.items()
+                ],
                 background=background,
                 unique=unique,
                 sparse=sparse,

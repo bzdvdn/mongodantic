@@ -1,6 +1,6 @@
 import copy
 import warnings
-from pydantic.main import ModelMetaclass
+from typing import TYPE_CHECKING
 
 from .helpers import ExtraQueryMapper
 from .exceptions import DuplicateQueryParamError
@@ -8,7 +8,11 @@ from .exceptions import DuplicateQueryParamError
 __all__ = ("Query", "LogicalCombination")
 
 
-def parse_query(model: ModelMetaclass, query: dict) -> dict:
+if TYPE_CHECKING:
+    from .models import BaseModel
+
+
+def parse_query(model: 'BaseModel', query: dict) -> dict:
     return model._validate_query_data(query)
 
 
