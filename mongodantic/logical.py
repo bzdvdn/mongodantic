@@ -17,7 +17,7 @@ def parse_query(model: 'BaseModel', query: dict) -> dict:
 
 
 class QueryNodeVisitor(object):
-    """Base visitor class for visiting Q-object nodes in a query tree.
+    """Base visitor class for visiting Query-object nodes in a query tree.
     """
 
     def prepare_combination(self, combination):
@@ -26,7 +26,7 @@ class QueryNodeVisitor(object):
         return combination
 
     def visit_query(self, query):
-        """Called by (New)Q objects.
+        """Called by (New)Query objects.
         """
         return query
 

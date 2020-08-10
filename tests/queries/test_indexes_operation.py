@@ -20,7 +20,7 @@ class TestIndexOperation(unittest.TestCase):
 
     def test_add_index(self):
         result = self.Ticket.querybuilder.add_index('position', 1)
-        assert result == 'index with name - position created.'
+        assert result == 'index with name - position_1 created.'
 
         with pytest.raises(MongoIndexError):
             result = self.Ticket.querybuilder.add_index('position', 1)
@@ -39,4 +39,4 @@ class TestIndexOperation(unittest.TestCase):
             result = self.Ticket.querybuilder.drop_index('position1111', 1)
 
         result = self.Ticket.querybuilder.drop_index('position', 1)
-        assert result == 'position dropped.'
+        assert result == 'position_1 dropped.'

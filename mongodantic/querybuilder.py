@@ -114,7 +114,7 @@ class QueryBuilder(object):
                 unique=unique,
                 sparse=sparse,
             )
-            return f'index with name - {index_name} created.'
+            return f'index with name - {index_name}_{index_type} created.'
         except Exception as e:
             raise MongoIndexError(f'detail: {str(e)}')
 
@@ -154,8 +154,10 @@ class QueryBuilder(object):
                 drop = True
                 self.__query('drop_index', index['name'])
         if drop:
-            return f'{index_name} dropped.'
-        raise MongoIndexError(f'invalid index name - {index_name}')
+            return f'{index_name}_{index_type} dropped.'
+        raise MongoIndexError(
+            f'invalid index name - {index_name} and index type - {index_type}'
+        )
 
     def count(
         self,
@@ -224,7 +226,6 @@ class QueryBuilder(object):
         sort: int = 1,
         **query,
     ) -> tuple:
-
         count = self.count(session=session, logical_query=logical_query, **query,)
         results = self.find(
             skip_rows=skip_rows,
