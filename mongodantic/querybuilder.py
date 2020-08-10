@@ -317,12 +317,9 @@ class QueryBuilder(object):
             session=session,
         )
 
-    def raw_query(
-        self,
-        method_name: str,
-        raw_query: Union[Dict, List[Dict], Tuple[Dict]],
-        session: Optional[ClientSession] = None,
-    ) -> Any:
+    def __validate_raw_query(
+        self, method_name: str, raw_query: Union[Dict, List[Dict], Tuple[Dict]]
+    ) -> tuple:
         if (
             'insert' in method_name
             or 'replace' in method_name
@@ -330,16 +327,26 @@ class QueryBuilder(object):
         ):
             if isinstance(raw_query, list):
                 raw_query = list(map(self._mongo_model._validate_query_data, raw_query))
-            elif isinstance(raw_query, tuple):
-                for query in raw_query:
-                    for key in query.keys():
-                        if '$' in key:
-                            query = query[key]
-                    self._mongo_model._validate_query_data(query)
-            else:
+            elif isinstance(raw_query, dict):
                 raw_query = self._mongo_model._validate_query_data(raw_query)
-        query = getattr(self._mongo_model.collection, method_name)
+            else:
+                params = [
+                    query[key] if '$' in key else query
+                    for query in raw_query
+                    for key in query.keys()
+                ]
+                map(self._mongo_model._validate_query_data, params)
         parsed_query = raw_query if isinstance(raw_query, tuple) else (raw_query,)
+        return parsed_query
+
+    def raw_query(
+        self,
+        method_name: str,
+        raw_query: Union[Dict, List[Dict], Tuple[Dict]],
+        session: Optional[ClientSession] = None,
+    ) -> Any:
+        parsed_query = self.__validate_raw_query(method_name, raw_query)
+        query = getattr(self._mongo_model.collection, method_name)
         return query(*parsed_query, session=session)
 
     def _update(
