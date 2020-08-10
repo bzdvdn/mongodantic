@@ -1,4 +1,4 @@
-from typing import Union, List, Dict, Optional, Any
+from typing import Union, List, Dict, Optional, Any, Tuple
 from collections.abc import Iterable
 from pymongo.collection import Collection
 from pymongo import ReturnDocument
@@ -320,7 +320,7 @@ class QueryBuilder(object):
     def raw_query(
         self,
         method_name: str,
-        raw_query: Union[Dict, List[Dict]],
+        raw_query: Union[Dict, List[Dict], Tuple[Dict]],
         session: Optional[ClientSession] = None,
     ) -> Any:
         if (
@@ -330,10 +330,17 @@ class QueryBuilder(object):
         ):
             if isinstance(raw_query, list):
                 raw_query = list(map(self._mongo_model._validate_query_data, raw_query))
+            elif isinstance(raw_query, tuple):
+                for query in raw_query:
+                    for key in query.keys():
+                        if '$' in key:
+                            query = query[key]
+                    self._mongo_model._validate_query_data(query)
             else:
                 raw_query = self._mongo_model._validate_query_data(raw_query)
         query = getattr(self._mongo_model.collection, method_name)
-        return query(raw_query, session=session)
+        parsed_query = raw_query if isinstance(raw_query, tuple) else (raw_query,)
+        return query(*parsed_query, session=session)
 
     def _update(
         self,

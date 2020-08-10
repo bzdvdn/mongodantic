@@ -56,3 +56,11 @@ class TestBasicOperation(unittest.TestCase):
             result = self.User.querybuilder.raw_query(
                 'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
             )
+        result = self.User.querybuilder.raw_query(
+            'update_one', raw_query=({'name': 'first'}, {'$set': {'name': 'updated'}})
+        )
+
+        assert result.modified_count == 1
+
+        modifed_result = self.User.querybuilder.find_one(email='first@mail.ru')
+        assert modifed_result.name == 'updated'
