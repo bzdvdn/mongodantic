@@ -20,11 +20,6 @@ class ModelMixin(object):
     def pk(self):
         return self._id
 
-    def __hash__(self):
-        if self.pk is None:
-            raise TypeError("MongoModel instances without _id value are unhashable")
-        return hash(self.pk)
-
     def __name__(self):
         return super().__name__()
 

@@ -155,3 +155,8 @@ class MongoModel(BaseModel):
 
     def serialize_json(self, fields: Union[tuple, list]) -> str:
         return dumps(self.serialize(fields))
+
+    def __hash__(self):
+        if self.pk is None:
+            raise TypeError("MongoModel instances without _id value are unhashable")
+        return hash(self.pk)
