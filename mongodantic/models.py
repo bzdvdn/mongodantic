@@ -4,8 +4,9 @@ from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
+from pydantic import validator
 
-from .db import DBConnectionMixin
+from .mixins import DBConnectionMixin, ModelMixin
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
@@ -15,15 +16,12 @@ from .exceptions import (
 from .helpers import ExtraQueryMapper
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
-from .querybuilder import QueryBuilderMixin
 
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
 
-class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
-    _id: Optional[ObjectIdStr] = None
-
+class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
     class Config:
         excluded_query_fields = ()
 
@@ -117,18 +115,6 @@ class BaseModel(DBConnectionMixin, QueryBuilderMixin, BasePydanticModel):
     @property
     def data(self) -> Dict:
         return self.dict()
-
-    @property
-    def pk(self):
-        return self._id
-
-    def __hash__(self):
-        if self.pk is None:
-            raise TypeError("MongoModel instances without _id value are unhashable")
-        return hash(self.pk)
-
-    def __name__(self):
-        return super().__name__()
 
 
 class MongoModel(BaseModel):

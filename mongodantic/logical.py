@@ -9,10 +9,10 @@ __all__ = ("Query", "LogicalCombination")
 
 
 if TYPE_CHECKING:
-    from .models import BaseModel
+    from .models import MongoModel
 
 
-def parse_query(model: 'BaseModel', query: dict) -> dict:
+def parse_query(model: 'MongoModel', query: dict) -> dict:
     return model._validate_query_data(query)
 
 

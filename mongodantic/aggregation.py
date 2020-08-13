@@ -4,7 +4,7 @@ from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
 
 if TYPE_CHECKING:
-    from .models import BaseModel
+    from .models import MongoModel
 
 
 __all__ = ('Lookup', 'LookupCombination', 'Sum', 'Avg', 'Min', 'Count', 'Max')
@@ -18,13 +18,13 @@ class BasicDefaultAggregation(object):
     def _operation(self) -> str:
         raise NotImplementedError('implement _operation')
 
-    def _validate_field(self, mongo_model: 'BaseModel'):
+    def _validate_field(self, mongo_model: 'MongoModel'):
         if self.field not in mongo_model.__fields__ and self.field != '_id':
             raise ValidationError(
                 f'{self.field} not in {mongo_model.__name__} field, field must be one of {list(mongo_model.__fields__.keys())}'
             )
 
-    def _aggregate_query(self, mongo_model: 'BaseModel') -> dict:
+    def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:
         self._validate_field(mongo_model)
         query = {
             f'{self.field}__{self._operation}': {
@@ -63,7 +63,7 @@ class Count(BasicDefaultAggregation):
     def _operation(self) -> str:
         return 'count'
 
-    def _aggregate_query(self, mongo_model: 'BaseModel') -> dict:
+    def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:
         self._validate_field(mongo_model)
         query = {
             "_id": f'${self.field}' if self.field != '_id' else None,
@@ -86,7 +86,7 @@ class LookupCombination(object):
     def __repr__(self):
         return " AND ".join([repr(node) for node in self.children])
 
-    def accept(self, main_model: 'BaseModel', project: Optional[dict] = None) -> tuple:
+    def accept(self, main_model: 'MongoModel', project: Optional[dict] = None) -> tuple:
         accepted_lookup = []
         reference_models = {}
         for node in self.children:
@@ -101,7 +101,7 @@ class LookupCombination(object):
 class Lookup(object):
     def __init__(
         self,
-        from_collection: 'BaseModel',
+        from_collection: 'MongoModel',
         local_field: str,
         foreign_field: str,
         as_: Optional[str] = None,
@@ -115,7 +115,7 @@ class Lookup(object):
         self.with_unwind = with_unwind
         self.preserve_null_and_empty_arrays = preserve_null_and_empty_arrays
 
-    def to_query(self, main_model: 'BaseModel') -> list:
+    def to_query(self, main_model: 'MongoModel') -> list:
         query = [
             {
                 '$lookup': {
@@ -137,7 +137,7 @@ class Lookup(object):
             )
         return query
 
-    def _validate_local_field(self, main_model: 'BaseModel') -> str:
+    def _validate_local_field(self, main_model: 'MongoModel') -> str:
         if (
             self.local_field
             not in set(
@@ -151,7 +151,7 @@ class Lookup(object):
     def _combine(self, other) -> LookupCombination:
         return LookupCombination([self, other])
 
-    def accept(self, main_model: 'BaseModel', project: Optional[dict] = None) -> tuple:
+    def accept(self, main_model: 'MongoModel', project: Optional[dict] = None) -> tuple:
         return LookupCombination([self]).accept(main_model, project)
 
     def __and__(self, other):

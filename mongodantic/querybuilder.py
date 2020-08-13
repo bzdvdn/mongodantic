@@ -27,7 +27,6 @@ from .helpers import (
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
-from .helpers import cached_classproperty
 from .aggregation import Lookup, LookupCombination
 
 
@@ -611,11 +610,3 @@ class QueryBuilder(object):
             self.__query('drop', query_params={})
             return drop_message
         return 'nope'
-
-
-class QueryBuilderMixin(object):
-    @cached_classproperty
-    def querybuilder(cls):
-        querybuilder = QueryBuilder()
-        querybuilder.add_model(cls)
-        return querybuilder

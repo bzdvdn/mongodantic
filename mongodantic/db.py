@@ -1,11 +1,8 @@
 import os
 from typing import Optional
 from pymongo import MongoClient, database
-from pymongo.collection import Collection
 
-from .helpers import cached_classproperty
-
-all = ('DBConnectionMixin',)
+all = ('_DBConnection',)
 
 
 class _DBConnection(object):
@@ -57,31 +54,3 @@ class _DBConnection(object):
         self._database = self._mongo_connection.get_database(self.db_name)
         return self._database
 
-
-class DBConnectionMixin(object):
-    _connection = _DBConnection()
-
-    @classmethod
-    def _reconnect(cls):
-        cls._connection = cls._connection._reconnect()
-
-    @classmethod
-    def get_database(cls):
-        return cls._connection.get_database()
-
-    @classmethod
-    def set_collection_name(cls) -> str:
-        return cls.__name__.lower()
-
-    @classmethod
-    def get_collection(cls) -> Collection:
-        db = cls.get_database()
-        return db.get_collection(cls.collection_name)
-
-    @cached_classproperty
-    def collection_name(cls):
-        return cls.set_collection_name()
-
-    @cached_classproperty
-    def collection(cls):
-        return cls.get_collection()
