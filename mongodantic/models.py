@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Dict, Any, Union, Optional, List
+from typing import Dict, Any, Union, Optional, List, Tuple
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass
@@ -118,10 +118,19 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
 
 
 class MongoModel(BaseModel):
-    def save(self, session: Optional[ClientSession] = None) -> Any:
+    def save(
+        self,
+        updated_fields: Union[Tuple, List] = [],
+        session: Optional[ClientSession] = None,
+    ) -> Any:
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
-            for field in self.__fields__:
+            if updated_fields:
+                if not all(field in self.__fields__ for field in updated_fields):
+                    raise ValidationError('invalid field in updated_fields')
+            else:
+                updated_fields = tuple(self.__fields__.keys())
+            for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
             self.querybuilder.update_one(**data, session=session)
             return self

@@ -177,7 +177,7 @@ def generate_name_field(name: Union[dict, str, None] = None):
     return name
 
 
-class cached_classproperty(object):
+class cached_classproperty(classmethod):
     def __init__(self, fget):
         self.obj = {}
         self.fget = fget
