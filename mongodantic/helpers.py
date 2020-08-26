@@ -80,27 +80,33 @@ class ExtraQueryMapper(object):
             raise TypeError("boolean_value must be a bool type")
         return {"$exists": boolean_value}
 
-    def type(self, bson_type):
+    def type(self, bson_type) -> dict:
         return {"$type": bson_type}
 
-    def gte(self, value: Any):
+    def search(self, search_text: str) -> cit:
+        return {'$search': search_text}
+
+    def all(self, query: Any) -> dict:
+        return {'$all': query}
+
+    def gte(self, value: Any) -> dict:
         return {"$gte": value}
 
-    def lte(self, value: Any):
+    def lte(self, value: Any) -> dict:
         return {"$lte": value}
 
-    def gt(self, value: Any):
+    def gt(self, value: Any) -> dict:
         return {"$gt": value}
 
-    def lt(self, value: Any):
+    def lt(self, value: Any) -> dict:
         return {"$lt": value}
 
-    def inc(self, value: int):
+    def inc(self, value: int) -> dict:
         if isinstance(value, int):
             return {'$inc': {self.field_name: value}}
         raise ValueError('value must be integer')
 
-    def range(self, range_values: Union[List, Tuple]):
+    def range(self, range_values: Union[List, Tuple]) -> dict:
         if len(range_values) != 2:
             raise ValueError("range must have 2 params")
         from_ = range_values[0]
