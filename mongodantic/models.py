@@ -81,6 +81,8 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
             inners = ()
             field, *extra_params = field.split("__")
             inners, extra_params = cls._parse_extra_params(extra_params)
+            if not inners and '.' in field:
+                field, *inners = field.split('.')
             if not cls.__validate_field(field):
                 continue
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)

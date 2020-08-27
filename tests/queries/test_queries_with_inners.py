@@ -38,3 +38,11 @@ class TestQueriesWithInners(unittest.TestCase):
         data = self.InnerTicket.querybuilder.find_one(config__url__startswith='goo')
         assert data.name == 'second'
 
+    def test_inner_update_one(self):
+        self.create_documents()
+        updated = self.InnerTicket.querybuilder.update_one(
+            config__url__startswith='goo', config__url__set='test.io'
+        )
+        assert updated == 1
+        data = self.InnerTicket.querybuilder.find_one(config__url__startswith='test')
+        assert data.name == 'second'
