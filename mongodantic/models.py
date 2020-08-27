@@ -64,10 +64,23 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
         return True
 
     @classmethod
+    def _parse_extra_params(cls, extra_params: tuple) -> tuple:
+        field_param, extra = [], []
+        methods = ExtraQueryMapper.methods
+        for param in extra_params:
+            if param in methods:
+                extra.append(param)
+            else:
+                field_param.append(param)
+        return field_param, extra
+
+    @classmethod
     def _validate_query_data(cls, query: Dict) -> Dict:
         data = {}
         for field, value in query.items():
+            inners = ()
             field, *extra_params = field.split("__")
+            inners, extra_params = cls._parse_extra_params(extra_params)
             if not cls.__validate_field(field):
                 continue
             _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
@@ -76,8 +89,11 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
             elif field == '_id':
                 value = ObjectId(value)
             else:
-                value = cls.__validate_value(field, value)
+                value = cls.__validate_value(field, value) if not inners else value
+            if inners:
+                field = f'{field}.{".".join(i for i in inners)}'
             data[field] = value
+        print('===== ', data)
         return data
 
     @classmethod

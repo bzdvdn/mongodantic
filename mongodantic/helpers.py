@@ -22,6 +22,18 @@ __all__ = (
 )
 
 
+class cached_classproperty(classmethod):
+    def __init__(self, fget):
+        self.obj = {}
+        self.fget = fget
+
+    def __get__(self, owner, cls):
+        if cls in self.obj:
+            return self.obj[cls]
+        self.obj[cls] = self.fget(cls)
+        return self.obj[cls]
+
+
 class ExtraQueryMapper(object):
     def __init__(self, field_name: str):
         self.field_name = field_name
@@ -40,42 +52,44 @@ class ExtraQueryMapper(object):
                     extra_method = 'in_'
                 elif extra_method == 'inc':
                     return self.inc(values)
+                elif extra_method == 'unset':
+                    return self.unset(values)
                 query[self.field_name].update(getattr(self, extra_method)(values))
             return query
         return {}
 
-    def in_(self, list_values: List):
+    def in_(self, list_values: List) -> dict:
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
         return {"$in": list_values}
 
-    def regex(self, regex_value: str):
+    def regex(self, regex_value: str) -> dict:
         return {"$regex": regex_value}
 
-    def regex_ne(self, regex_value: str):
+    def regex_ne(self, regex_value: str) -> dict:
         return {"$not": compile(regex_value)}
 
-    def ne(self, value: Any):
+    def ne(self, value: Any) -> dict:
         return {"$ne": value}
 
-    def startswith(self, value: str):
+    def startswith(self, value: str) -> dict:
         return {"$regex": f"^{value}"}
 
-    def not_startswith(self, value: str):
+    def not_startswith(self, value: str) -> dict:
         return {"$not": compile(f"^{value}")}
 
-    def endswith(self, value: str):
+    def endswith(self, value: str) -> dict:
         return {"$regex": f"{value}$"}
 
-    def not_endswith(self, value: str):
+    def not_endswith(self, value: str) -> dict:
         return {"$not": compile(f"{value}$")}
 
-    def nin(self, list_values: List):
+    def nin(self, list_values: List) -> dict:
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
         return {"$nin": list_values}
 
-    def exists(self, boolean_value: bool):
+    def exists(self, boolean_value: bool) -> dict:
         if not isinstance(boolean_value, bool):
             raise TypeError("boolean_value must be a bool type")
         return {"$exists": boolean_value}
@@ -83,11 +97,14 @@ class ExtraQueryMapper(object):
     def type(self, bson_type) -> dict:
         return {"$type": bson_type}
 
-    def search(self, search_text: str) -> cit:
+    def search(self, search_text: str) -> dict:
         return {'$search': search_text}
 
     def all(self, query: Any) -> dict:
         return {'$all': query}
+
+    def unset(self, value: Any) -> dict:
+        return {"$unset": {self.field_name: value}}
 
     def gte(self, value: Any) -> dict:
         return {"$gte": value}
@@ -112,6 +129,16 @@ class ExtraQueryMapper(object):
         from_ = range_values[0]
         to_ = range_values[1]
         return {"$gte": from_, "$lte": to_}
+
+    @cached_classproperty
+    def methods(cls) -> list:
+        methods = []
+        for f in cls.__dict__:
+            if f == 'in_':
+                methods.append('in')
+            elif not f.startswith('__') and f != 'extra_query':
+                methods.append(f)
+        return methods
 
 
 def chunk_by_length(items: List, step: int):
@@ -181,15 +208,3 @@ def generate_name_field(name: Union[dict, str, None] = None):
     if isinstance(name, dict):
         return '|'.join(str(v) for v in name.values())
     return name
-
-
-class cached_classproperty(classmethod):
-    def __init__(self, fget):
-        self.obj = {}
-        self.fget = fget
-
-    def __get__(self, owner, cls):
-        if cls in self.obj:
-            return self.obj[cls]
-        self.obj[cls] = self.fget(cls)
-        return self.obj[cls]
