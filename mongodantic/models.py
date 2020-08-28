@@ -78,7 +78,6 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
     def _validate_query_data(cls, query: Dict) -> Dict:
         data = {}
         for field, value in query.items():
-            inners = ()
             field, *extra_params = field.split("__")
             inners, extra_params = cls._parse_extra_params(extra_params)
             if not cls.__validate_field(field):
@@ -93,7 +92,6 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
             if inners:
                 field = f'{field}.{".".join(i for i in inners)}'
             data[field] = value
-        print('===== ', data)
         return data
 
     @classmethod

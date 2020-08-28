@@ -46,6 +46,11 @@ class TestBasicOperation(unittest.TestCase):
         inserted = self.Ticket.querybuilder.insert_many(data)
         assert inserted == 2
 
+    def test_count(self):
+        self.test_insert_many()
+        count = self.Ticket.querybuilder.count()
+        assert count == 2
+
     def test_find_one(self):
         self.test_insert_one()
         data = self.Ticket.querybuilder.find_one(name='first')

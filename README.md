@@ -50,14 +50,19 @@ banners_generator = Banner.querybuilder.find().generator # generator of Banner o
 banners_generator_of_dicts = Banner.querybuilder.find().data_generator # generator of Banner objects
 count, banners = Banner.querybuilder.find_with_count() # return tuple(int, QuerySet)
 
+serializeble_fields = Banner.querybuilder.find().serialize(['utm', 'banner_id', 'name']) # return list with dict like {'utm':..., 'banner_id': ..,'name': ...}
+generator_serializeble_fields = Banner.querybuilder.find().serialize_generator(['utm', 'banner_id', 'name']) # return generator
+json_serializeble_fields = Banner.querybuilder.find().serialize_json(['utm', 'banner_id', 'name']) # returnn json str serializeble
+
 # count
 count = Banner.querybuilder.count(name='test')
 
 # insert queries
-Banner.querybuilder.insert_one(banner_id=1, name='test', utm={'utm_source': 'yandex', 'utm_campaign': 'cpc'})
+Banner.querybuilder.insert_one(banner_id=1, name='test', utm={'utm_source': 'yandex', 'utm_medium': 'cpc'})
 
 banners = [Banner(banner_id=2, name='test2', utm={}), Banner(banner_id=3, name='test3', utm={})]
 Banner.querybuilder.insert_many(banners) # list off models obj, or dicts
+Banner.querybuilder.bulk_create(banners, batch_size=1000) # insert_many with batch
 
 # update queries
 Banner.querybuilder.update_one(banner_id=1, name__set='updated') # parameters that end __set - been updated  
@@ -88,6 +93,9 @@ Banner.querybuilder.find(name__ne='test') # != test
 
 Banner.querybuilder.find(banner_id__gte=1, banner_id__lte=10) # id >=1 and id <=10
 Banner.querybuilder.find(banner_id__gt=1, banner_id__lt=10) # id >1 and id <10
+Banner.querybuilder.find_one(banner_id=1, utm__utm_medium='cpm') # find banner where banner_id=1, and utm['utm_medium'] == 'cpm'
+
+Banner.querybuilder.update_one(banner_id=1, utm__utm_source__set='google') # update utms['utm_source'] in Banner
 
 # find and update
 Banner.querybuilder.find_and_update(banner_id=1, name__set='updated', projection_fields=['name': True]) # return {'name': 'updated}
@@ -123,9 +131,11 @@ class Stats(MongoModel):
     shows: int
     date: str
 
-Stats.querybuilder.aggregate_sum(date='2020-01-20', agg_field='cost')
-Stats.querybuilder.aggregate_min(date='2020-01-20', agg_field='clicks')
-Stats.querybuilder.aggregate_max(date='2020-01-20', agg_field='shows')
+from mongodantic.aggregation import Sum, Min, Max
+
+Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Sum('cost'))
+Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Min('clicks'))
+Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Max('shows'))
 
 # sessions
 from mongodantic.session import Session

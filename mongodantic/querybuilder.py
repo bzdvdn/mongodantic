@@ -164,6 +164,13 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
+        if getattr(self._mongo_model.collection, 'count_documents'):
+            return self.__query(
+                'count_documents',
+                logical_query or query,
+                session=session,
+                logical=bool(logical_query),
+            )
         return self.__query(
             'count',
             logical_query or query,

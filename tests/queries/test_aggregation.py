@@ -128,7 +128,8 @@ class TestAggregation(unittest.TestCase):
         assert result_agg == {'cost__avg': 2.5, 'quantity__max': 3}
 
         result_not_match_agg = self.Product.querybuilder.aggregate(
-            Query(title='not_match'), aggregation=[Avg('cost'), Max('quantity')]
+            Query(title__ne='not_match') & Query(title__startswith='not'),
+            aggregation=[Avg('cost'), Max('quantity')],
         )
         assert result_not_match_agg == {}
 
@@ -139,7 +140,6 @@ class TestAggregation(unittest.TestCase):
             )
 
     def test_aggregate_lookup(self):
-
         product_inserted_id = self.Product.querybuilder.insert_one(
             title='product1',
             cost=23.00,
