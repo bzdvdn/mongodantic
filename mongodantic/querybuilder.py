@@ -293,8 +293,7 @@ class QueryBuilder(object):
                 data = self._mongo_model._validate_query_data({name: value})
                 set_values.update(data)
             else:
-                data = self._mongo_model._validate_query_data({name: value})
-                queries.update(data)
+                queries.update({name: value})
         return queries, set_values
 
     def replace_one(
