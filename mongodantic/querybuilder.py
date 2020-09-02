@@ -182,17 +182,17 @@ class QueryBuilder(object):
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         **query,
     ) -> Any:
-        sort_values = [(field, sort) for field in sort_fields]
+
         data = self.__query(
             'find_one',
             logical_query or query,
             session=session,
             logical=bool(logical_query),
-            sort=sort_values,
+            sort=[(field, sort) for field in sort_fields] if sort_fields else None,
         )
         if data:
             obj = self._mongo_model.parse_obj(data)
@@ -205,7 +205,7 @@ class QueryBuilder(object):
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         **query,
     ) -> QuerySet:
@@ -218,9 +218,14 @@ class QueryBuilder(object):
             data = data.limit(limit_rows)
         if sort not in (1, -1):
             raise ValueError(f'invalid sort value must be 1 or -1 not {sort}')
-        sort_values = [(field, sort) for field in sort_fields]
+        print('==== sort fields - ', sort_fields)
 
-        return QuerySet(self._mongo_model, data.sort(sort_values))
+        return QuerySet(
+            self._mongo_model,
+            data.sort([(field, sort) for field in sort_fields])
+            if sort_fields
+            else data,
+        )
 
     def find_with_count(
         self,
@@ -228,7 +233,7 @@ class QueryBuilder(object):
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         **query,
     ) -> tuple:
@@ -238,7 +243,9 @@ class QueryBuilder(object):
             limit_rows=limit_rows,
             session=session,
             logical_query=logical_query,
-            sort_fields=sort_fields,
+            sort_fields=[(field, sort) for field in sort_fields]
+            if sort_fields
+            else None,
             sort=sort,
             **query,
         )
@@ -424,7 +431,7 @@ class QueryBuilder(object):
         logical_query: Union[Query, LogicalCombination, None] = None,
         lookup: Union[Lookup, LookupCombination, None] = None,
         project: Optional[dict] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
@@ -442,7 +449,8 @@ class QueryBuilder(object):
         ]
         accepted_lookup, reference_models = lookup.accept(self._mongo_model, project)
         query_params.extend(accepted_lookup)
-        query_params.append({'$sort': {sf: sort for sf in sort_fields}})
+        if sort_fields:
+            query_params.append({'$sort': {sf: sort for sf in sort_fields}})
         if limit_rows:
             query_params.append({'$limit': limit_rows})
         data = self.__query(
@@ -531,7 +539,7 @@ class QueryBuilder(object):
         self,
         operation: str,
         projection_fields: Optional[list] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
@@ -539,7 +547,6 @@ class QueryBuilder(object):
     ) -> Any:
         filter_, set_values = self._ensure_update_data(**query)
         return_document = ReturnDocument.AFTER
-        sort_value = [(field, sort) for field in sort_fields]
         replacement = query.pop('replacement', None)
 
         projection = {f: True for f in projection_fields} if projection_fields else None
@@ -547,9 +554,10 @@ class QueryBuilder(object):
             'return_document': return_document,
             'projection': projection,
             'upsert': upsert,
-            'sort': sort_value,
             'session': session,
         }
+        if sort_fields:
+            extra_params['sort'] = [(field, sort) for field in sort_fields]
 
         if replacement:
             extra_params['replacement'] = replacement
@@ -564,7 +572,7 @@ class QueryBuilder(object):
     def find_one_and_update(
         self,
         projection_fields: Optional[list] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
@@ -574,7 +582,9 @@ class QueryBuilder(object):
         return self._find_with_replacement_or_with_update(
             'find_one_and_update',
             projection_fields=projection_fields,
-            sort_fields=sort_fields,
+            sort_fields=[(field, sort) for field in sort_fields]
+            if sort_fields
+            else None,
             sort=sort,
             upsert=upsert,
             session=session,
@@ -585,7 +595,7 @@ class QueryBuilder(object):
         self,
         replacement: Union[dict, Any],
         projection_fields: Optional[list] = None,
-        sort_fields: Union[tuple, list] = ('_id',),
+        sort_fields: Optional[Union[tuple, list]] = None,
         sort: int = 1,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
@@ -596,7 +606,9 @@ class QueryBuilder(object):
         return self._find_with_replacement_or_with_update(
             'find_and_replace',
             projection_fields=projection_fields,
-            sort_fields=sort_fields,
+            sort_fields=[(field, sort) for field in sort_fields]
+            if sort_fields
+            else None,
             sort=sort,
             upsert=upsert,
             session=session,

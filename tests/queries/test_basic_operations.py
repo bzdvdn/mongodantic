@@ -63,7 +63,9 @@ class TestBasicOperation(unittest.TestCase):
     def test_find(self):
         self.test_insert_many()
         data = self.Ticket.querybuilder.find(name='second').list
-        sort = self.Ticket.querybuilder.find(name='second', sort=-1).first()
+        sort = self.Ticket.querybuilder.find(
+            name='second', sort=-1, sort_fields=('_id',)
+        ).first()
         assert sort.config == {'param1': '3333'}
         assert isinstance(data, list)
         assert len(data) == 2
