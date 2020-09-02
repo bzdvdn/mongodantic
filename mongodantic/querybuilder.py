@@ -192,7 +192,7 @@ class QueryBuilder(object):
             logical_query or query,
             session=session,
             logical=bool(logical_query),
-            sort=[(field, sort) for field in sort_fields] if sort_fields else None,
+            sort=[(field, sort or 1) for field in sort_fields] if sort_fields else None,
         )
         if data:
             obj = self._mongo_model.parse_obj(data)
@@ -224,7 +224,7 @@ class QueryBuilder(object):
 
         return QuerySet(
             self._mongo_model,
-            data.sort([(field, sort) for field in sort_fields])
+            data.sort([(field, sort or 1) for field in sort_fields])
             if sort_fields
             else data,
         )
@@ -245,7 +245,7 @@ class QueryBuilder(object):
             limit_rows=limit_rows,
             session=session,
             logical_query=logical_query,
-            sort_fields=[(field, sort) for field in sort_fields]
+            sort_fields=[(field, sort or 1) for field in sort_fields]
             if sort_fields
             else None,
             sort=sort,
@@ -559,7 +559,7 @@ class QueryBuilder(object):
             'session': session,
         }
         if sort_fields:
-            extra_params['sort'] = [(field, sort) for field in sort_fields]
+            extra_params['sort'] = [(field, sort or 1) for field in sort_fields]
 
         if replacement:
             extra_params['replacement'] = replacement
@@ -584,7 +584,7 @@ class QueryBuilder(object):
         return self._find_with_replacement_or_with_update(
             'find_one_and_update',
             projection_fields=projection_fields,
-            sort_fields=[(field, sort) for field in sort_fields]
+            sort_fields=[(field, sort or 1) for field in sort_fields]
             if sort_fields
             else None,
             sort=sort,
