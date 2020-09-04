@@ -24,6 +24,7 @@ from .helpers import (
     chunk_by_length,
     bulk_query_generator,
     generate_name_field,
+    sort_validation,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
@@ -186,7 +187,7 @@ class QueryBuilder(object):
         sort: Optional[int] = None,
         **query,
     ) -> Any:
-
+        sort, sort_fields = sort_validation(sort, sort_fields)
         data = self.__query(
             'find_one',
             logical_query or query,
@@ -216,12 +217,7 @@ class QueryBuilder(object):
             data = data.skip(skip_rows)
         if limit_rows:
             data = data.limit(limit_rows)
-        if sort is not None:
-            if sort not in (1, -1):
-                raise ValueError(f'invalid sort value must be 1 or -1 not {sort}')
-            if not sort_fields:
-                sort_field = ('_id',)
-
+        sort, sort_fields = sort_validation(sort, sort_fields)
         return QuerySet(
             self._mongo_model,
             data.sort([(field, sort or 1) for field in sort_fields])
@@ -245,9 +241,7 @@ class QueryBuilder(object):
             limit_rows=limit_rows,
             session=session,
             logical_query=logical_query,
-            sort_fields=[(field, sort or 1) for field in sort_fields]
-            if sort_fields
-            else None,
+            sort_fields=sort_fields,
             sort=sort,
             **query,
         )

@@ -208,3 +208,14 @@ def generate_name_field(name: Union[dict, str, None] = None):
     if isinstance(name, dict):
         return '|'.join(str(v) for v in name.values())
     return name
+
+
+def sort_validation(
+    sort: Optional[int] = None, sort_fields: Union[list, tuple, None] = None
+) -> Tuple[Any, ...]:
+    if sort is not None:
+        if sort not in (1, -1):
+            raise ValueError(f'invalid sort value must be 1 or -1 not {sort}')
+        if not sort_fields:
+            sort_fields = ('_id',)
+    return sort, sort_fields

@@ -32,6 +32,20 @@ class TestQueriesWithInners(unittest.TestCase):
             position=2,
             config={'url': 'google.com', 'username': 'staff'},
         )
+        self.InnerTicket.querybuilder.insert_one(
+            name='third',
+            position=3,
+            config={'url': 'yahoo.com', 'username': 'trololo'},
+        )
+
+    def test_update_many(self):
+        self.create_documents()
+        updated = self.InnerTicket.querybuilder.update_many(
+            position__range=[2, 3], name__ne='hhh', config__url__set='test.io'
+        )
+        assert updated == 2
+        last = self.InnerTicket.querybuilder.find_one(sort=-1)
+        assert last.config['url'] == 'test.io'
 
     def test_inner_find_one(self):
         self.create_documents()
