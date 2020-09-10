@@ -128,7 +128,10 @@ class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
 
     @property
     def data(self) -> Dict:
-        return self.dict()
+        data = self.dict()
+        if '_id' in data:
+            data['_id'] = data['_id'].__str__()
+        return data
 
 
 class MongoModel(BaseModel):
