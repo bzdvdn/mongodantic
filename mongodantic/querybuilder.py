@@ -400,9 +400,9 @@ class QueryBuilder(object):
             aggregate_query = {}
         if group_by:
             group_by = group_by_aggregate_generation(group_by)
-            if '$group' in aggregate_query:
-                aggregate_query = aggregate_query['$group']
-                aggregate_query.pop('_id')
+            print('agg - ', aggregate_query)
+            aggregate_query.pop('_id', None)
+            print('=== ', aggregate_query)
             group_params = {"$group": {"_id": group_by, **aggregate_query}}
         else:
             group_params = {

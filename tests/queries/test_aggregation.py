@@ -130,7 +130,7 @@ class TestAggregation(unittest.TestCase):
         result_group_by_by_inners = self.Product.querybuilder.aggregate(
             group_by=['config.type_id'], aggregation=Count('_id')
         )
-        assert result_group_by_by_inners == [{'_id': {'type_id': 2}, 'count': 4}]
+        assert result_group_by_by_inners == {'2': {'count': 4}}
 
         result_sum_and_avg_agg_with_group_many = self.Product.querybuilder.aggregate(
             aggregation=[Avg('cost'), Sum('cost')],
