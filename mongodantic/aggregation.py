@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, Any
 
 from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params

@@ -21,6 +21,7 @@ class TestAggregation(unittest.TestCase):
             cost: float
             quantity: int
             product_type: str
+            config: dict
 
         class ProductImage(MongoModel):
             url: str
@@ -39,6 +40,7 @@ class TestAggregation(unittest.TestCase):
                 cost=float(i),
                 quantity=i,
                 product_type=product_types[randint(1, 3)],
+                config={'type_id': i},
             )
             for i in range(1, 5)
         ]
@@ -62,6 +64,7 @@ class TestAggregation(unittest.TestCase):
                 cost=float(i),
                 quantity=i - 1,
                 product_type=product_types[2] if i != 4 else product_types[1],
+                config={'type_id': 2},
             )
             for i in range(1, 5)
         ]
@@ -111,6 +114,24 @@ class TestAggregation(unittest.TestCase):
             'phone': {'cost__avg': 4.0, 'cost__sum': 4.0},
             'book': {'cost__avg': 2.0, 'cost__sum': 6.0},
         }
+
+        result_raw_group_by_by_inners = self.Product.querybuilder.raw_aggregate(
+            data=[
+                {
+                    "$group": {
+                        "_id": {'type_id': "$config.type_id"},
+                        'count': {f'$sum': 1},
+                    }
+                },
+            ],
+        )
+        assert result_raw_group_by_by_inners == [{'_id': {'type_id': 2}, 'count': 4}]
+
+        result_group_by_by_inners = self.Product.querybuilder.aggregate(
+            group_by=['config.type_id'], aggregation=Count('_id')
+        )
+        assert result_group_by_by_inners == [{'_id': {'type_id': 2}, 'count': 4}]
+
         result_sum_and_avg_agg_with_group_many = self.Product.querybuilder.aggregate(
             aggregation=[Avg('cost'), Sum('cost')],
             group_by=['product_type', 'quantity'],
@@ -145,6 +166,7 @@ class TestAggregation(unittest.TestCase):
             cost=23.00,
             quantity=23,
             product_type=product_types[randint(1, 3)],
+            config={'type_id': 1},
         )
         image_inserted_id = self.ProductImage.querybuilder.insert_one(
             url='http://localhost:8000/image.png',

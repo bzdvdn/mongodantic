@@ -25,6 +25,7 @@ from .helpers import (
     bulk_query_generator,
     generate_name_field,
     sort_validation,
+    group_by_aggregate_generation,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
@@ -380,24 +381,28 @@ class QueryBuilder(object):
     ) -> int:
         return self._update('update_many', query, upsert=upsert, session=session)
 
+    def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None):
+        return list(self.__query("aggregate", data, session=session))
+
     def aggregate(self, *args, **query) -> dict:
         session = query.pop('session', None)
         aggregation = query.pop('aggregation', None)
         group_by = query.pop('group_by', None)
-        if not aggregation:
-            raise ValueError('miss aggregation')
+        if not aggregation and not group_by:
+            raise ValueError('miss aggregation or group_by')
         if isinstance(aggregation, Iterable):
             aggregate_query = {}
             for agg in aggregation:
                 aggregate_query.update(agg._aggregate_query(self._mongo_model))
-        else:
+        elif aggregation is not None:
             aggregate_query = aggregation._aggregate_query(self._mongo_model)
+        else:
+            aggregate_query = {}
         if group_by:
-            group_by = (
-                {g: f'${g}' for g in group_by}
-                if isinstance(group_by, (list, tuple))
-                else f'${group_by}'
-            )
+            group_by = group_by_aggregate_generation(group_by)
+            if '$group' in aggregate_query:
+                aggregate_query = aggregate_query['$group']
+                aggregate_query.pop('_id')
             group_params = {"$group": {"_id": group_by, **aggregate_query}}
         else:
             group_params = {
