@@ -12,6 +12,8 @@ class ModelMixin(object):
 
     @cached_classproperty
     def querybuilder(cls):
+        indexes = getattr(cls.__config__, 'indexes', {})
+        print('==== ', indexes)
         querybuilder = QueryBuilder()
         querybuilder.add_model(cls)
         return querybuilder

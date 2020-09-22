@@ -2,7 +2,7 @@ from json import dumps
 from typing import Dict, Any, Union, Optional, List, Tuple
 from pymongo.client_session import ClientSession
 from bson import ObjectId
-from pydantic.main import ModelMetaclass
+from pydantic.main import ModelMetaclass as PydanticModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
 from pydantic import validator
 
@@ -20,8 +20,20 @@ from .logical import LogicalCombination, Query
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
+_is_mongo_model_class_defined = False
 
-class BaseModel(DBConnectionMixin, ModelMixin, BasePydanticModel):
+
+class ModelMetaclass(PydanticModelMetaclass):
+    def __new__(mcs, name, bases, namespace, **kwargs):
+        cls = super().__new__(mcs, name, bases, namespace, **kwargs)
+        if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
+            print('opas')
+        return cls
+
+
+class BaseModel(
+    DBConnectionMixin, ModelMixin, BasePydanticModel, metaclass=ModelMetaclass
+):
     class Config:
         excluded_query_fields = ()
 
@@ -177,3 +189,6 @@ class MongoModel(BaseModel):
         if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
+
+
+_is_mongo_model_class_defined = True
