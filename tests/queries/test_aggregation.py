@@ -121,11 +121,14 @@ class TestAggregation(unittest.TestCase):
                     "$group": {
                         "_id": {'type_id': "$config.type_id"},
                         'count': {f'$sum': 1},
+                        'names': {'$push': '$title'},
                     }
                 },
             ],
         )
-        assert result_raw_group_by_by_inners == [{'_id': {'type_id': 2}, 'count': 4}]
+        assert result_raw_group_by_by_inners == [
+            {'_id': {'type_id': 2}, 'count': 4, 'names': ['1', '2', '3', '4']}
+        ]
 
         result_group_by_by_inners = self.Product.querybuilder.aggregate(
             group_by=['config.type_id'], aggregation=Count('_id')

@@ -71,6 +71,11 @@ class TestBasicOperation(unittest.TestCase):
         assert len(data) == 2
         assert isinstance(data[0], MongoModel)
 
+    def test_distinct(self):
+        self.test_insert_many()
+        data = self.Ticket.querybuilder.distinct('config.param1', name='second')
+        assert data == ['2222', '3333']
+
     def test_queryset_serialize(self):
         self.test_insert_many()
         data = self.Ticket.querybuilder.find(name='second').serialize(

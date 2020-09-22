@@ -381,6 +381,13 @@ class QueryBuilder(object):
     ) -> int:
         return self._update('update_many', query, upsert=upsert, session=session)
 
+    def distinct(
+        self, field: str, session: Optional[ClientSession] = None, **query
+    ) -> Union[list, dict]:
+        query = self._mongo_model._validate_query_data(query)
+        method = getattr(self._mongo_model.collection, 'distinct')
+        return method(key=field, filter=query)
+
     def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None):
         return list(self.__query("aggregate", data, session=session))
 
