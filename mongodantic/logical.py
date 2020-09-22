@@ -80,7 +80,7 @@ class QueryNode(object):
     AND = 0
     OR = 1
 
-    def to_query(self, model):
+    def to_query(self, model) -> dict:
         query = self.accept(SimplificationVisitor(model))
         if not isinstance(query, dict):
             query = query.accept(QueryCompilerVisitor(model))

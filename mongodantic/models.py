@@ -1,20 +1,20 @@
 from json import dumps
-from typing import Dict, Any, Union, Optional, List, Tuple
+from typing import Dict, Any, Union, Optional, List, Tuple, no_type_check
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
-from pydantic import validator
+from pymongo.collection import Collection
 
-from .mixins import DBConnectionMixin, ModelMixin
+from .db import _DBConnection
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
     ValidationError,
     InvalidArgsParams,
 )
-from .helpers import ExtraQueryMapper
-from .queryset import QuerySet
+from .helpers import ExtraQueryMapper, cached_classproperty
+from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
 
 
@@ -24,16 +24,18 @@ _is_mongo_model_class_defined = False
 
 
 class ModelMetaclass(PydanticModelMetaclass):
+    _connection = _DBConnection()
+
     def __new__(mcs, name, bases, namespace, **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
-            print('opas')
+            _querybuilder = QueryBuilder()
+            _querybuilder.add_model(cls)
+            setattr(cls, '_querybuilder', _querybuilder)
         return cls
 
 
-class BaseModel(
-    DBConnectionMixin, ModelMixin, BasePydanticModel, metaclass=ModelMetaclass
-):
+class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     class Config:
         excluded_query_fields = ()
 
@@ -76,7 +78,7 @@ class BaseModel(
         return True
 
     @classmethod
-    def _parse_extra_params(cls, extra_params: tuple) -> tuple:
+    def _parse_extra_params(cls, extra_params: List) -> tuple:
         field_param, extra = [], []
         methods = ExtraQueryMapper.methods
         for param in extra_params:
@@ -109,6 +111,7 @@ class BaseModel(
     @classmethod
     def __validate_value(cls, field_name: str, value: Any) -> Any:
         field = cls.__fields__[field_name]
+        error_ = None
         if isinstance(field, ObjectIdStr):
             try:
                 value = field.validate(value)
@@ -145,8 +148,35 @@ class BaseModel(
             data['_id'] = data['_id'].__str__()
         return data
 
+    @classmethod
+    def get_database(cls):
+        return cls._connection.get_database()
+
+    @classmethod
+    def set_collection_name(cls) -> str:
+        return cls.__name__.lower()
+
+    @classmethod
+    def get_collection(cls) -> Collection:
+        db = cls.get_database()
+        return db.get_collection(cls.collection_name)
+
+    @cached_classproperty
+    def collection_name(cls):
+        return cls.set_collection_name()
+
+    @cached_classproperty
+    def collection(cls):
+        return cls.get_collection()
+
+    @cached_classproperty
+    def querybuilder(cls):
+        return cls._querybuilder
+
 
 class MongoModel(BaseModel):
+    _id: Optional[ObjectIdStr] = None
+
     def save(
         self,
         updated_fields: Union[Tuple, List] = [],
@@ -189,6 +219,10 @@ class MongoModel(BaseModel):
         if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
+
+    @property
+    def pk(self):
+        return self._id
 
 
 _is_mongo_model_class_defined = True

@@ -23,6 +23,9 @@ class TestBasicOperation(unittest.TestCase):
         Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
+    def test_collection_name(self):
+        assert self.Ticket.collection_name == 'ticket'
+
     def test_insert_one(self):
         data = {'name': 'first', 'position': 1, 'config': {'param1': 'value'}}
         object_id = self.Ticket.querybuilder.insert_one(**data)
