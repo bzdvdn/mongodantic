@@ -8,7 +8,7 @@ from mongodantic.exceptions import MongoIndexError
 
 
 class TestIndexOperation(unittest.TestCase):
-    def setUp(self, drop=True, basic_indexes=True):
+    def setUp(self, drop=False, basic_indexes=True):
         init_db_connection_params("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
@@ -18,9 +18,9 @@ class TestIndexOperation(unittest.TestCase):
 
             class Config:
                 if basic_indexes:
-                    indexes = [IndexModel([('position', 1)])]
+                    indexes = [IndexModel([('position', 1)]), IndexModel([('name', 1)])]
                 else:
-                    indexes = []
+                    indexes = indexes = [IndexModel([('position', 1)])]
 
         if drop:
             Ticket.querybuilder.drop_collection(force=True)
@@ -32,11 +32,16 @@ class TestIndexOperation(unittest.TestCase):
         assert result == {
             '_id_': {'key': {'_id': 1}},
             'position_1': {'key': {'position': 1}},
+            'name_1': {'key': {'name': 1}},
         }
 
     def test_check_indexes_if_remove(self):
+        self.setUp(False, False)
         result = self.Ticket.querybuilder.check_indexes()
-        assert result == {}
+        assert result == {
+            '_id_': {'key': {'_id': 1}},
+            'position_1': {'key': {'position': 1}},
+        }
 
     def test_drop_index(self):
         self.setUp(False)
@@ -45,3 +50,4 @@ class TestIndexOperation(unittest.TestCase):
 
         result = self.Ticket.querybuilder.drop_index('position_1')
         assert result == 'position_1 dropped.'
+        self.setUp(True, False)

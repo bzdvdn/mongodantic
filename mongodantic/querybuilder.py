@@ -90,7 +90,6 @@ class QueryBuilder(object):
 
     def check_indexes(self) -> dict:
         index_list = list(self.__query('list_indexes', {}))
-        print('=== ', index_list)
         return_data = {}
         for index in index_list:
             d = dict(index)
@@ -361,9 +360,7 @@ class QueryBuilder(object):
             aggregate_query = {}
         if group_by:
             group_by = group_by_aggregate_generation(group_by)
-            print('agg - ', aggregate_query)
             aggregate_query.pop('_id', None)
-            print('=== ', aggregate_query)
             group_params = {"$group": {"_id": group_by, **aggregate_query}}
         else:
             group_params = {
