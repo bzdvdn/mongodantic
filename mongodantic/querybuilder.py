@@ -90,6 +90,7 @@ class QueryBuilder(object):
 
     def check_indexes(self) -> dict:
         index_list = list(self.__query('list_indexes', {}))
+        print('=== ', index_list)
         return_data = {}
         for index in index_list:
             d = dict(index)

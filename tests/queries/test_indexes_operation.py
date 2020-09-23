@@ -8,7 +8,7 @@ from mongodantic.exceptions import MongoIndexError
 
 
 class TestIndexOperation(unittest.TestCase):
-    def setUp(self, drop=True):
+    def setUp(self, drop=True, basic_indexes=True):
         init_db_connection_params("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
@@ -17,7 +17,10 @@ class TestIndexOperation(unittest.TestCase):
             config: dict
 
             class Config:
-                indexes = [IndexModel([('position', 1)])]
+                if basic_indexes:
+                    indexes = [IndexModel([('position', 1)])]
+                else:
+                    indexes = []
 
         if drop:
             Ticket.querybuilder.drop_collection(force=True)
@@ -30,6 +33,10 @@ class TestIndexOperation(unittest.TestCase):
             '_id_': {'key': {'_id': 1}},
             'position_1': {'key': {'position': 1}},
         }
+
+    def test_check_indexes_if_remove(self):
+        result = self.Ticket.querybuilder.check_indexes()
+        assert result == {}
 
     def test_drop_index(self):
         self.setUp(False)

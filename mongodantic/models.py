@@ -42,12 +42,19 @@ class ModelMetaclass(PydanticModelMetaclass):
                 indexes_to_create = [
                     i for i in indexes if i.document['name'] not in db_indexes
                 ]
-                print('indexes_to_create - ', indexes_to_create)
+                indexes_to_delete = [
+                    i
+                    for i in db_indexes
+                    if i not in [i.document['name'] for i in indexes] and i != '_id_'
+                ]
                 result = []
                 if indexes_to_create:
                     result = cls._querybuilder.create_indexes(indexes_to_create)
+                if indexes_to_delete:
+                    for index_name in indexes_to_delete:
+                        cls._querybuilder.drop_index(index_name)
+                    db_indexes = cls._querybuilder.check_indexes()
                 indexes = set(list(db_indexes.keys()) + result)
-                db_indexes = cls._querybuilder.check_indexes()
         setattr(cls, '__indexes__', indexes)
         return cls
 
