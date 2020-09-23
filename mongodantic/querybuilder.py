@@ -2,6 +2,7 @@ from typing import Union, List, Dict, Optional, Any, Tuple
 from collections.abc import Iterable
 from pymongo.collection import Collection
 from pymongo import ReturnDocument
+from pymongo import IndexModel
 from pymongo.client_session import ClientSession
 from pymongo.errors import (
     BulkWriteError,
@@ -87,78 +88,30 @@ class QueryBuilder(object):
                 **kwargs,
             )
 
-    def check_indexes(self) -> List:
+    def check_indexes(self) -> dict:
         index_list = list(self.__query('list_indexes', {}))
-        return_list = []
+        return_data = {}
         for index in index_list:
             d = dict(index)
-            _dict = {'name': d['name'], 'key': dict(d['key'])}
-            return_list.append(_dict)
-        return return_list
+            _dict = {d['name']: {'key': dict(d['key'])}}
+            return_data.update(_dict)
+        return return_data
 
-    def add_index(
+    def create_indexes(
         self,
-        index_name: str,
-        index_type: int,
+        indexes: List[IndexModel],
         background: bool = True,
-        unique: bool = False,
-        sparse: bool = False,
-    ) -> str:
-        indexes = [index['name'] for index in self.check_indexes()]
-        if f'{index_name}_{index_type}' in indexes:
-            raise MongoIndexError(f'{index_name} - already exists.')
-        try:
-            self.__query(
-                'create_index',
-                [(index_name, index_type)],
-                background=background,
-                unique=unique,
-                sparse=sparse,
-            )
-            return f'index with name - {index_name}_{index_type} created.'
-        except Exception as e:
-            raise MongoIndexError(f'detail: {str(e)}')
+        session: Optional[ClientSession] = None,
+    ) -> List[str]:
+        return self.__query('create_indexes', indexes)
 
-    def add_compound_index(
-        self,
-        background: bool = True,
-        unique: bool = False,
-        sparse: bool = False,
-        **indexes,
-    ) -> str:
-        if not indexes:
-            raise ValueError('miss indexes')
-        index_name = f'_'.join(f'{name}_{type_}' for name, type_ in indexes.items())
-        db_indexes = [index['name'] for index in self.check_indexes()]
-        if index_name in db_indexes:
-            raise MongoIndexError(f'{index_name} - already exists.')
-        try:
-            self.__query(
-                'create_index',
-                [
-                    (index_name, index_type)
-                    for index_name, index_type in indexes.items()
-                ],
-                background=background,
-                unique=unique,
-                sparse=sparse,
-            )
-            return f'index with name - {index_name} created.'
-        except Exception as e:
-            raise MongoIndexError(f'detail: {str(e)}')
-
-    def drop_index(self, index_name: str, index_type: int) -> str:
+    def drop_index(self, index_name: str) -> str:
         indexes = self.check_indexes()
-        drop = False
-        for index in indexes:
-            if f'{index_name}_{index_type}' in index['name']:
-                drop = True
-                self.__query('drop_index', index['name'])
-        if drop:
-            return f'{index_name}_{index_type} dropped.'
-        raise MongoIndexError(
-            f'invalid index name - {index_name} and index type - {index_type}'
-        )
+        if index_name in indexes:
+            drop = True
+            self.__query('drop_index', index_name)
+            return f'{index_name} dropped.'
+        raise MongoIndexError(f'invalid index name - {index_name}')
 
     def count(
         self,

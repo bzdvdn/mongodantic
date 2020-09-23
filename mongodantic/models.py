@@ -5,6 +5,7 @@ from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
 from pymongo.collection import Collection
+from pymongo import IndexModel
 
 from .db import _DBConnection
 from .types import ObjectIdStr
@@ -28,10 +29,26 @@ class ModelMetaclass(PydanticModelMetaclass):
 
     def __new__(mcs, name, bases, namespace, **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
+        indexes = set()
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
-            _querybuilder = QueryBuilder()
-            _querybuilder.add_model(cls)
-            setattr(cls, '_querybuilder', _querybuilder)
+            querybuilder = QueryBuilder()
+            querybuilder.add_model(cls)
+            setattr(cls, '_querybuilder', querybuilder)
+            indexes = getattr(cls.__config__, 'indexes', [])
+            if not all([isinstance(index, IndexModel) for index in indexes]):
+                raise ValueError('indexes must be list of IndexModel instances')
+            if indexes:
+                db_indexes = cls._querybuilder.check_indexes()
+                indexes_to_create = [
+                    i for i in indexes if i.document['name'] not in db_indexes
+                ]
+                print('indexes_to_create - ', indexes_to_create)
+                result = []
+                if indexes_to_create:
+                    result = cls._querybuilder.create_indexes(indexes_to_create)
+                indexes = set(list(db_indexes.keys()) + result)
+                db_indexes = cls._querybuilder.check_indexes()
+        setattr(cls, '__indexes__', indexes)
         return cls
 
 
