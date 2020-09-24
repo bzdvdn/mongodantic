@@ -55,7 +55,9 @@ class ModelMetaclass(PydanticModelMetaclass):
                         cls._querybuilder.drop_index(index_name)
                     db_indexes = cls._querybuilder.check_indexes()
                 indexes = set(list(db_indexes.keys()) + result)
+        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         setattr(cls, '__indexes__', indexes)
+        setattr(cls, '__exclude_fields__', exclude_fields)
         return cls
 
 
@@ -92,10 +94,9 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def __validate_field(cls, field: str) -> bool:
-        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         if field not in cls.__fields__ and field != '_id':
             raise NotDeclaredField(field, list(cls.__fields__.keys()))
-        elif field in exclude_fields:
+        elif field in cls.__exclude_fields__:
             return False
         return True
 
