@@ -60,9 +60,6 @@ class ModelMetaclass(PydanticModelMetaclass):
 
 
 class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
-    class Config:
-        excluded_query_fields = ()
-
     def __setattr__(self, key, value):
         if key in self.__fields__:
             return super().__setattr__(key, value)
@@ -95,9 +92,10 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def __validate_field(cls, field: str) -> bool:
+        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         if field not in cls.__fields__ and field != '_id':
             raise NotDeclaredField(field, list(cls.__fields__.keys()))
-        elif field in cls.Config.excluded_query_fields:
+        elif field in exclude_fields:
             return False
         return True
 
