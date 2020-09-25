@@ -223,7 +223,10 @@ def sort_validation(
 
 def group_by_aggregate_generation(group_by: Any) -> Any:
     if isinstance(group_by, (list, tuple)):
-        return {g if '.' not in g else g.split('.')[-1]: f'${g}' for g in group_by}
+        return {
+            g if '.' not in g else g.split('.')[-1]: f'${g}' if '$' not in g else g
+            for g in group_by
+        }
     if '.' in group_by:
         name = group_by.split('.')[-1]
         return {name: f'${group_by}'}

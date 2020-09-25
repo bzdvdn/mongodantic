@@ -1,6 +1,6 @@
 import copy
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from .helpers import ExtraQueryMapper
 from .exceptions import DuplicateQueryParamError
@@ -32,10 +32,10 @@ class QueryNodeVisitor(object):
 
 
 class SimplificationVisitor(QueryNodeVisitor):
-    def __init__(self, model=None):
+    def __init__(self, model: Optional['MongoModel'] = None):
         self.model = model
 
-    def prepare_combination(self, combination):
+    def prepare_combination(self, combination: 'LogicalCombination'):
         if combination.operation == combination.AND:
             # The simplification only applies to 'simple' queries
             if all(isinstance(node, Query) for node in combination.children):
@@ -63,15 +63,15 @@ class QueryCompilerVisitor(QueryNodeVisitor):
     def __init__(self, model):
         self.model = model
 
-    def prepare_combination(self, combination):
+    def prepare_combination(self, combination: 'LogicalCombination'):
         operator = "$and"
         if combination.operation == combination.OR:
             operator = "$or"
         return {operator: combination.children}
 
-    def visit_query(self, query):
-        query = parse_query(self.model, query.query)
-        return query
+    def visit_query(self, query: 'Query') -> dict:
+        data = parse_query(self.model, query.query)
+        return data
 
 
 class QueryNode(object):
@@ -169,9 +169,9 @@ class Query(QueryNode):
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.query == other.query
 
-    def accept(self, visit):
+    def accept(self, visit: 'QueryNodeVisitor') -> 'Query':
         return visit.visit_query(self)
 
     @property
-    def empty(self):
+    def empty(self) -> bool:
         return not bool(self.query)

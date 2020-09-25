@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Dict, Any, Union, Optional, List, Tuple, no_type_check
+from typing import Dict, Any, Union, Optional, List, Tuple, no_type_check, Set, Type
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
@@ -62,6 +62,9 @@ class ModelMetaclass(PydanticModelMetaclass):
 
 
 class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
+    __indexes__: Set['str'] = set()
+    __exclude_fields__: Union[Tuple, List] = tuple()
+
     def __setattr__(self, key, value):
         if key in self.__fields__:
             return super().__setattr__(key, value)
