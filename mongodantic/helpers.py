@@ -227,4 +227,4 @@ def group_by_aggregate_generation(group_by: Any) -> Any:
     if '.' in group_by:
         name = group_by.split('.')[-1]
         return {name: f'${group_by}'}
-    return group_by
+    return f'${group_by}' if not '$' in group_by else group_by
