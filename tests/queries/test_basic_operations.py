@@ -16,6 +16,7 @@ class TestBasicOperation(unittest.TestCase):
             config: dict
             sign: int = 1
             type_: str = 'ga'
+            array: list = [1, 2]
 
             class Config:
                 excluded_query_fields = ('sign', 'type')
@@ -27,7 +28,12 @@ class TestBasicOperation(unittest.TestCase):
         assert self.Ticket.collection_name == 'ticket'
 
     def test_insert_one(self):
-        data = {'name': 'first', 'position': 1, 'config': {'param1': 'value'}}
+        data = {
+            'name': 'first',
+            'position': 1,
+            'config': {'param1': 'value'},
+            'array': ['test', 'adv'],
+        }
         object_id = self.Ticket.querybuilder.insert_one(**data)
         assert isinstance(object_id, ObjectId)
 
@@ -43,11 +49,28 @@ class TestBasicOperation(unittest.TestCase):
 
     def test_insert_many(self):
         data = [
-            self.Ticket(name='second', position=2, config={'param1': '2222'}),
-            self.Ticket(name='second', position=2, config={'param1': '3333'}),
+            self.Ticket(
+                name='second',
+                position=2,
+                config={'param1': '2222'},
+                array=['test', 'google'],
+            ),
+            self.Ticket(
+                name='second',
+                position=2,
+                config={'param1': '3333'},
+                array=['test', 'adv'],
+            ),
         ]
         inserted = self.Ticket.querybuilder.insert_many(data)
         assert inserted == 2
+
+    def test_find_in_array(self):
+        self.test_insert_many()
+        data = self.Ticket.querybuilder.find_one(array__in=['google']).data
+        assert data['array'] == ['test', 'google']
+        miss = self.Ticket.querybuilder.find_one(array__in=['miss_data'])
+        assert miss is None
 
     def test_count(self):
         self.test_insert_many()
