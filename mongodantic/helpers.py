@@ -66,6 +66,9 @@ class ExtraQueryMapper(object):
     def regex(self, regex_value: str) -> dict:
         return {"$regex": regex_value}
 
+    def iregex(self, regex_value: str) -> dict:
+        return {"$regex": regex_value, "$options": "i"}
+
     def regex_ne(self, regex_value: str) -> dict:
         return {"$not": compile(regex_value)}
 
@@ -75,11 +78,17 @@ class ExtraQueryMapper(object):
     def startswith(self, value: str) -> dict:
         return {"$regex": f"^{value}"}
 
+    def istartswith(self, value: str) -> dict:
+        return {"$regex": f"^{value}", "$options": "i"}
+
     def not_startswith(self, value: str) -> dict:
         return {"$not": compile(f"^{value}")}
 
     def endswith(self, value: str) -> dict:
         return {"$regex": f"{value}$"}
+
+    def iendswith(self, value: str) -> dict:
+        return {"$regex": f"{value}$", "$options": "i"}
 
     def not_endswith(self, value: str) -> dict:
         return {"$not": compile(f"{value}$")}

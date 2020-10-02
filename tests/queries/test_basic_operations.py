@@ -1,8 +1,9 @@
 import unittest
+
 from bson import ObjectId
 
+from mongodantic import init_db_connection_params, querybuilder
 from mongodantic.models import MongoModel
-from mongodantic import init_db_connection_params
 from mongodantic.session import Session
 
 
@@ -71,6 +72,11 @@ class TestBasicOperation(unittest.TestCase):
         assert data['array'] == ['test', 'google']
         miss = self.Ticket.querybuilder.find_one(array__in=['miss_data'])
         assert miss is None
+
+    def test_find_with_regex(self):
+        self.test_insert_many()
+        data = self.Ticket.querybuilder.find_one(name__iregex="seCoNd")
+        assert data.name == 'second'
 
     def test_count(self):
         self.test_insert_many()
