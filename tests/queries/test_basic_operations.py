@@ -66,6 +66,24 @@ class TestBasicOperation(unittest.TestCase):
         inserted = self.Ticket.querybuilder.insert_many(data)
         assert inserted == 2
 
+    def test_insert_many_with_dict(self):
+        data = [
+            self.Ticket(
+                name='third',
+                position=3,
+                config={'param1': '2222'},
+                array=['test', 'google'],
+            ).data,
+            self.Ticket(
+                name='four',
+                position=4,
+                config={'param1': '3333'},
+                array=['test', 'adv'],
+            ).data,
+        ]
+        inserted = self.Ticket.querybuilder.insert_many(data)
+        assert inserted == 2
+
     def test_find_in_array(self):
         self.test_insert_many()
         data = self.Ticket.querybuilder.find_one(array__in=['google']).data

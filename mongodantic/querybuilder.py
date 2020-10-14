@@ -209,8 +209,7 @@ class QueryBuilder(object):
     def insert_many(self, data: List, session: Optional[ClientSession] = None) -> int:
         parse_obj = self._mongo_model.parse_obj
         query = [
-            parse_obj(obj).data if isinstance(obj, ModelMetaclass) else obj.data
-            for obj in data
+            parse_obj(obj).data if isinstance(obj, dict) else obj.data for obj in data
         ]
         r = self.__query('insert_many', query, session=session)
         return len(r.inserted_ids)
