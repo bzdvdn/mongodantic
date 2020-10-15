@@ -1,6 +1,5 @@
 from typing import Union, List, Dict, Optional, Any, Tuple
 from collections.abc import Iterable
-from pymongo.collection import Collection
 from pymongo import ReturnDocument
 from pymongo import IndexModel
 from pymongo.client_session import ClientSession
@@ -13,8 +12,6 @@ from pymongo.errors import (
     ServerSelectionTimeoutError,
 )
 from bson import ObjectId
-from pydantic.main import ModelMetaclass
-from pydantic import BaseModel as BasePydanticModel
 
 from .exceptions import (
     ValidationError,
@@ -31,6 +28,7 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .aggregation import Lookup, LookupCombination
+from .db import _DBConnection
 
 
 class QueryBuilder(object):
@@ -74,7 +72,8 @@ class QueryBuilder(object):
             WriteConcernError,
             ServerSelectionTimeoutError,
         ) as description:
-            self._mongo_model._reconnect()
+            del self._mongo_model._connection
+            self._mongo_model._connection = _DBConnection()
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1

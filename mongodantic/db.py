@@ -1,5 +1,4 @@
 import os
-from typing import Optional
 from pymongo import MongoClient, database
 
 all = ('_DBConnection',)
