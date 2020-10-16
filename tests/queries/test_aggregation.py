@@ -57,6 +57,18 @@ class TestAggregation(unittest.TestCase):
         avg_ = self.Product.querybuilder.aggregate(aggregation=Avg('cost'))
         assert avg_ == {'cost__avg': 2.5}
 
+        simple_avg = self.Product.querybuilder.aggregate_sum('cost')
+        assert simple_avg == 10.0
+
+        simple_max = self.Product.querybuilder.aggregate_max('cost')
+        assert simple_max == 4
+
+        simple_min = self.Product.querybuilder.aggregate_min('cost')
+        assert simple_min == 1
+
+        simple_avg = self.Product.querybuilder.aggregate_avg('cost')
+        assert simple_avg == 2.5
+
     def test_aggregation_multiply(self):
         data = [
             self.Product(
