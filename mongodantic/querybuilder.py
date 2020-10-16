@@ -4,7 +4,6 @@ from pymongo import ReturnDocument
 from pymongo import IndexModel
 from pymongo.client_session import ClientSession
 from pymongo.errors import (
-    BulkWriteError,
     NetworkTimeout,
     AutoReconnect,
     ConnectionFailure,
@@ -27,7 +26,7 @@ from .helpers import (
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
-from .aggregation import Lookup, LookupCombination
+from .aggregation import Lookup, LookupCombination, Sum, Max, Min, Avg
 from .db import _DBConnection
 
 
@@ -382,6 +381,26 @@ class QueryBuilder(object):
             name = generate_name_field(r.pop('_id'))
             result_data.update({name: r} if name else r)
         return result_data
+
+    def aggregate_sum(self, agg_field: str, **query):
+        return self.aggregate(aggregation=Sum(agg_field), **query).get(
+            f'{agg_field}__sum', 0
+        )
+
+    def aggregate_max(self, agg_field: str, **query):
+        return self.aggregate(aggregation=Max(agg_field), **query).get(
+            f'{agg_field}__max', 0
+        )
+
+    def aggregate_min(self, agg_field: str, **query):
+        return self.aggregate(aggregation=Min(agg_field), **query).get(
+            f'{agg_field}__min', 0
+        )
+
+    def aggregate_avg(self, agg_field: str, **query):
+        return self.aggregate(aggregation=Avg(agg_field), **query).get(
+            f'{agg_field}__avg', 0
+        )
 
     def aggregate_lookup(
         self,
