@@ -71,8 +71,6 @@ class QueryBuilder(object):
             WriteConcernError,
             ServerSelectionTimeoutError,
         ) as description:
-            del self._mongo_model._connection
-            self._mongo_model._connection = _DBConnection()
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
