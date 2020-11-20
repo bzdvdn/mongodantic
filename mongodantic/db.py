@@ -27,9 +27,9 @@ class _DBConnection(object):
         self.socket_timeout_ms = _connection_settings[alias]['socket_timeout_ms']
         self._mongo_connection = self._init_mongo_connection()
         self._database = None
+        _connections[alias] = self
 
     def _init_mongo_connection(self, connect: bool = False) -> MongoClient:
-        print(connect)
         connection_params = dict(
             connect=connect,
             serverSelectionTimeoutMS=self.server_selection_timeout_ms,
