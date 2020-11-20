@@ -21,7 +21,7 @@ class BasicDefaultAggregation(object):
     def _validate_field(self, mongo_model: 'MongoModel'):
         if self.field not in mongo_model.__fields__ and self.field != '_id':
             raise ValidationError(
-                f'{self.field} not in {mongo_model.__name__} field, field must be one of {list(mongo_model.__fields__.keys())}'
+                f'invalid field "{self.field}" for this model, field must be one of {list(mongo_model.__fields__.keys())}'
             )
 
     def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:

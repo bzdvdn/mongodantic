@@ -1,5 +1,8 @@
-import os
 from typing import Optional
+
+DEFAULT_CONNECTION_NAME = 'default'
+
+_connection_settings = {}
 
 
 def init_db_connection_params(
@@ -11,18 +14,15 @@ def init_db_connection_params(
     server_selection_timeout_ms: int = 50000,
     connect_timeout_ms: int = 50000,
     socket_timeout_ms: int = 50000,
+    alias: str = DEFAULT_CONNECTION_NAME,
 ) -> None:
-    os.environ['MONGODANTIC_CONNECTION_STR'] = connection_str
-    os.environ['MONGODANTIC_DBNAME'] = dbname
-    os.environ['MONGODANTIC_SSL'] = '1' if ssl else '0'
-    os.environ['MONGODANTICPOOL_SIZE'] = str(max_pool_size)
-    if server_selection_timeout_ms:
-        os.environ['MONGODANTIC_SERVER_SELECTION_TIMEOUT_MS'] = str(
-            server_selection_timeout_ms
-        )
-    if connect_timeout_ms:
-        os.environ['MONGODANTIC_CONNECT_TIMEOUT_MS'] = str(connect_timeout_ms)
-    if socket_timeout_ms:
-        os.environ['MONGODANTIC_SOCKET_TIMEOUT_MS'] = str(socket_timeout_ms)
-    if ssl_cert_path:
-        os.environ['MONGODANTIC_SSL_CERT_PATH'] = ssl_cert_path
+    _connection_settings[alias] = {
+        'connection_str': connection_str,
+        'dbname': dbname,
+        'ssl': ssl,
+        'pool_size': max_pool_size,
+        'server_selection_timeout_ms': server_selection_timeout_ms,
+        'connect_timeout_ms': connect_timeout_ms,
+        'socket_timeout_ms': socket_timeout_ms,
+        'ssl_cert_path': ssl_cert_path,
+    }

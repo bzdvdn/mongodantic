@@ -25,8 +25,6 @@ _is_mongo_model_class_defined = False
 
 
 class ModelMetaclass(PydanticModelMetaclass):
-    _connection = _DBConnection()
-
     def __new__(mcs, name, bases, namespace, **kwargs):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         indexes = set()
@@ -159,7 +157,8 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _start_session(cls) -> ClientSession:
-        return cls._connection._mongo_connection.start_session()
+        client = cls._connection._mongo_connection
+        return client.start_session()
 
     @classmethod
     def sort_fields(cls, fields: Union[tuple, list, None]) -> None:
@@ -173,6 +172,14 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
         if '_id' in data:
             data['_id'] = data['_id'].__str__()
         return data
+
+    @classmethod
+    def _get_connection(cls):
+        return _DBConnection()
+
+    @cached_classproperty
+    def _connection(cls):
+        return cls._get_connection()
 
     @classmethod
     def get_database(cls):
