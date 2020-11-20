@@ -27,7 +27,6 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .aggregation import Lookup, LookupCombination, Sum, Max, Min, Avg
-from .db import _DBConnection
 
 
 class QueryBuilder(object):

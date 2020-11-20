@@ -29,7 +29,7 @@ class _DBConnection(object):
         self._database = None
         _connections[alias] = self
 
-    def _init_mongo_connection(self, connect: bool = False) -> MongoClient:
+    def _init_mongo_connection(self, connect: bool = True) -> MongoClient:
         connection_params = dict(
             connect=connect,
             serverSelectionTimeoutMS=self.server_selection_timeout_ms,

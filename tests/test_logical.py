@@ -26,7 +26,7 @@ class TestLogicalQuery(unittest.TestCase):
         value = {
             '$or': [
                 {'name': '123'},
-                {'$and': [{'name': {'$ne': 124}}, {'position': 1}]},
+                {'$and': [{'name': {'$ne': '124'}}, {'position': 1}]},
                 {'position': 2},
             ]
         }

@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Dict, Any, Union, Optional, List, Tuple, no_type_check, Set, Type
+from typing import Dict, Any, Union, Optional, List, Tuple, Set
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
@@ -14,7 +14,7 @@ from .exceptions import (
     ValidationError,
     InvalidArgsParams,
 )
-from .helpers import ExtraQueryMapper, cached_classproperty
+from .helpers import ExtraQueryMapper, cached_classproperty, _validate_value
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
 
@@ -120,32 +120,17 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
             inners, extra_params = cls._parse_extra_params(extra_params)
             if not cls.__validate_field(field):
                 continue
-            _dict = ExtraQueryMapper(field).extra_query(extra_params, value)
-            if _dict:
-                value = _dict[field]
+            extra = ExtraQueryMapper(cls, field).extra_query(extra_params, value)
+            if extra:
+                value = extra[field]
             elif field == '_id':
                 value = ObjectId(value)
             else:
-                value = cls.__validate_value(field, value) if not inners else value
+                value = _validate_value(cls, field, value) if not inners else value
             if inners:
                 field = f'{field}.{".".join(i for i in inners)}'
             data[field] = value
         return data
-
-    @classmethod
-    def __validate_value(cls, field_name: str, value: Any) -> Any:
-        field = cls.__fields__[field_name]
-        error_ = None
-        if isinstance(field, ObjectIdStr):
-            try:
-                value = field.validate(value)
-            except ValueError as e:
-                error_ = e
-        else:
-            value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
-        if error_:
-            raise ValidationError([error_], type(value))
-        return value
 
     @classmethod
     def _check_query_args(

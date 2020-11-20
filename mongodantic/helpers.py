@@ -1,5 +1,15 @@
 from re import compile
-from typing import List, Any, Dict, Tuple, Union, Optional, Callable
+from typing import (
+    List,
+    Any,
+    Dict,
+    Tuple,
+    Union,
+    Optional,
+    Callable,
+    TYPE_CHECKING,
+    Type,
+)
 from pydantic import BaseModel as BasePydanticModel
 from bson import ObjectId
 from pymongo import UpdateOne
@@ -11,7 +21,11 @@ from pymongo.errors import (
     WriteConcernError,
 )
 
-from .exceptions import MongoConnectionError
+from .exceptions import MongoConnectionError, ValidationError
+from .types import ObjectIdStr
+
+if TYPE_CHECKING:
+    from .models import BaseModel
 
 __all__ = (
     'ExtraQueryMapper',
@@ -34,9 +48,27 @@ class cached_classproperty(classmethod):
         return self.obj[cls]
 
 
+def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
+    field = cls.__fields__.get(field_name)
+    if not field:
+        raise AttributeError(f'invalid field - {field_name}')
+    error_ = None
+    if isinstance(field, ObjectIdStr):
+        try:
+            value = field.validate(value)
+        except ValueError as e:
+            error_ = e
+    else:
+        value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
+    if error_:
+        raise ValidationError([error_], type(value))
+    return value
+
+
 class ExtraQueryMapper(object):
-    def __init__(self, field_name: str):
+    def __init__(self, model: Type['BaseModel'], field_name: str):
         self.field_name = field_name
+        self.model = model
 
     def extra_query(self, extra_methods: List, values) -> Dict:
         if self.field_name == '_id':
@@ -61,7 +93,14 @@ class ExtraQueryMapper(object):
     def in_(self, list_values: List) -> dict:
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
-        return {"$in": list_values}
+        try:
+            return {
+                "$in": [
+                    _validate_value(self.model, self.field_name, v) for v in list_values
+                ]
+            }
+        except ValidationError:
+            return {"$in": list_values}
 
     def regex(self, regex_value: str) -> dict:
         return {"$regex": regex_value}
@@ -73,7 +112,7 @@ class ExtraQueryMapper(object):
         return {"$not": compile(regex_value)}
 
     def ne(self, value: Any) -> dict:
-        return {"$ne": value}
+        return {"$ne": _validate_value(self.model, self.field_name, value)}
 
     def startswith(self, value: str) -> dict:
         return {"$regex": f"^{value}"}
@@ -96,7 +135,14 @@ class ExtraQueryMapper(object):
     def nin(self, list_values: List) -> dict:
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
-        return {"$nin": list_values}
+        try:
+            return {
+                "$nin": [
+                    _validate_value(self.model, self.field_name, v) for v in list_values
+                ]
+            }
+        except ValidationError:
+            return {"$nin": list_values}
 
     def exists(self, boolean_value: bool) -> dict:
         if not isinstance(boolean_value, bool):
@@ -116,16 +162,16 @@ class ExtraQueryMapper(object):
         return {"$unset": {self.field_name: value}}
 
     def gte(self, value: Any) -> dict:
-        return {"$gte": value}
+        return {"$gte": _validate_value(self.model, self.field_name, value)}
 
     def lte(self, value: Any) -> dict:
-        return {"$lte": value}
+        return {"$lte": _validate_value(self.model, self.field_name, value)}
 
     def gt(self, value: Any) -> dict:
-        return {"$gt": value}
+        return {"$gt": _validate_value(self.model, self.field_name, value)}
 
     def lt(self, value: Any) -> dict:
-        return {"$lt": value}
+        return {"$lt": _validate_value(self.model, self.field_name, value)}
 
     def inc(self, value: int) -> dict:
         if isinstance(value, int):
@@ -137,7 +183,10 @@ class ExtraQueryMapper(object):
             raise ValueError("range must have 2 params")
         from_ = range_values[0]
         to_ = range_values[1]
-        return {"$gte": from_, "$lte": to_}
+        return {
+            "$gte": _validate_value(self.model, self.field_name, from_),
+            "$lte": _validate_value(self.model, self.field_name, to_),
+        }
 
     @cached_classproperty
     def methods(cls) -> list:
