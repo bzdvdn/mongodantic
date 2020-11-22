@@ -73,6 +73,7 @@ class QueryBuilder(object):
             if counter >= 5:
                 raise MongoConnectionError(str(description))
             counter += 1
+            self._mongo_model._connection = self._mongo_model._connecton._reconnect()
             return self.__query(
                 method_name=method_name,
                 query_params=inner_query_params,
