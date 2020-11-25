@@ -191,8 +191,8 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     def collection_name(cls):
         return cls.set_collection_name()
 
-    @cached_classproperty
-    def collection(cls):
+    @classproperty
+    def _collection(cls):
         return cls.get_collection()
 
     @cached_classproperty

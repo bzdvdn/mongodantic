@@ -53,7 +53,7 @@ class QueryBuilder(object):
         elif isinstance(query_params, dict):
             query_params = self._mongo_model._validate_query_data(query_params)
 
-        method = getattr(self._mongo_model.collection, method_name)
+        method = getattr(self._mongo_model._collection, method_name)
         query = [query_params]
         if session:
             kwargs['session'] = session
@@ -115,7 +115,7 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        if getattr(self._mongo_model.collection, 'count_documents'):
+        if getattr(self._mongo_model._collection, 'count_documents'):
             return self.__query(
                 'count_documents',
                 logical_query or query,
@@ -303,7 +303,7 @@ class QueryBuilder(object):
         session: Optional[ClientSession] = None,
     ) -> Any:
         parsed_query = self.__validate_raw_query(method_name, raw_query)
-        query = getattr(self._mongo_model.collection, method_name)
+        query = getattr(self._mongo_model._collection, method_name)
         return query(*parsed_query, session=session)
 
     def _update(
@@ -333,7 +333,7 @@ class QueryBuilder(object):
         self, field: str, session: Optional[ClientSession] = None, **query
     ) -> Union[list, dict]:
         query = self._mongo_model._validate_query_data(query)
-        method = getattr(self._mongo_model.collection, 'distinct')
+        method = getattr(self._mongo_model._collection, 'distinct')
         return method(key=field, filter=query)
 
     def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None):

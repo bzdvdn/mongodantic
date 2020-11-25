@@ -8,11 +8,6 @@ _connections: dict = {}
 
 
 class _DBConnection(object):
-    def __new__(cls, alias: str = DEFAULT_CONNECTION_NAME, *args, **kwargs):
-        if alias not in _connections:
-            return super(_DBConnection, cls).__new__(cls)
-        return _connections[alias]
-
     def __init__(self, alias: str = DEFAULT_CONNECTION_NAME):
         self._alias = alias
         self.connection_string = _connection_settings[alias]['connection_str']
