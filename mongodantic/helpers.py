@@ -48,6 +48,18 @@ class cached_classproperty(classmethod):
         return self.obj[cls]
 
 
+class classproperty:
+    def __init__(self, method=None):
+        self.fget = method
+
+    def __get__(self, instance, cls=None):
+        return self.fget(cls)
+
+    def getter(self, method):
+        self.fget = method
+        return self
+
+
 def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
     field = cls.__fields__.get(field_name)
     if not field:

@@ -14,7 +14,12 @@ from .exceptions import (
     ValidationError,
     InvalidArgsParams,
 )
-from .helpers import ExtraQueryMapper, cached_classproperty, _validate_value
+from .helpers import (
+    ExtraQueryMapper,
+    cached_classproperty,
+    _validate_value,
+    classproperty,
+)
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
 
@@ -62,6 +67,7 @@ class ModelMetaclass(PydanticModelMetaclass):
 class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     __indexes__: Set['str'] = set()
     __exclude_fields__: Union[Tuple, List] = tuple()
+    __connection__: Optional[_DBConnection] = None
 
     def __setattr__(self, key, value):
         if key in self.__fields__:
@@ -162,9 +168,11 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     def _get_connection(cls):
         return _DBConnection()
 
-    @cached_classproperty
+    @classproperty
     def _connection(cls):
-        return cls._get_connection()
+        if not cls.__connection__:
+            cls.__connection__ = cls._get_connection()
+        return cls.__connection__
 
     @classmethod
     def get_database(cls):

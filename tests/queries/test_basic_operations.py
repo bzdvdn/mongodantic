@@ -39,14 +39,6 @@ class TestBasicOperation(unittest.TestCase):
         object_id = self.Ticket.querybuilder.insert_one(**data)
         assert isinstance(object_id, ObjectId)
 
-    def test_multiproc(self):
-        def find_one(model):
-            return model.querybuilder.find_one()
-
-        pool = multiprocessing.Pool(8, find_one, [self.Ticket])
-        s = pool.map(find_one, [])
-        assert s == []
-
     def test_serialize(self):
         self.test_insert_one()
         data = self.Ticket.querybuilder.find_one().serialize(
