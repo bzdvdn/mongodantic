@@ -111,7 +111,7 @@ class Lookup(object):
         self.from_collection = from_collection
         self.local_field = local_field
         self.foreign_field = foreign_field
-        self.as_ = as_ if as_ else self.from_collection.collection_name
+        self.as_ = as_ if as_ else self.from_collection._collection_name
         self.with_unwind = with_unwind
         self.preserve_null_and_empty_arrays = preserve_null_and_empty_arrays
 
@@ -120,7 +120,7 @@ class Lookup(object):
             {
                 '$lookup': {
                     'localField': self._validate_local_field(main_model),
-                    'from': self.from_collection.collection_name,
+                    'from': self.from_collection._collection_name,
                     'foreignField': self.foreign_field,
                     'as': self.as_,
                 }

@@ -26,8 +26,14 @@ class TestBasicOperation(unittest.TestCase):
         Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
+    def test_reconnect(self):
+        old_connection = self.Ticket._connection._mongo_connection
+        self.Ticket._reconnect()
+        new_connection = self.Ticket._connection._mongo_connection
+        assert id(old_connection) != id(new_connection)
+
     def test_collection_name(self):
-        assert self.Ticket.collection_name == 'ticket'
+        assert self.Ticket._collection_name == 'ticket'
 
     def test_insert_one(self):
         data = {

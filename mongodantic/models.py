@@ -185,10 +185,16 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     @classmethod
     def get_collection(cls) -> Collection:
         db = cls.get_database()
-        return db.get_collection(cls.collection_name)
+        return db.get_collection(cls._collection_name)
 
-    @cached_classproperty
-    def collection_name(cls):
+    @classmethod
+    def _reconnect(cls):
+        if cls.__connection__:
+            cls.__connection__._mongo_connection.close()
+        cls.__connection__ = cls._get_connection()
+
+    @classproperty
+    def _collection_name(cls):
         return cls.set_collection_name()
 
     @classproperty
