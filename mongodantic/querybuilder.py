@@ -94,17 +94,13 @@ class QueryBuilder(object):
         return return_data
 
     def create_indexes(
-        self,
-        indexes: List[IndexModel],
-        background: bool = True,
-        session: Optional[ClientSession] = None,
+        self, indexes: List[IndexModel], session: Optional[ClientSession] = None,
     ) -> List[str]:
-        return self.__query('create_indexes', indexes)
+        return self.__query('create_indexes', indexes, session=session)
 
     def drop_index(self, index_name: str) -> str:
         indexes = self.check_indexes()
         if index_name in indexes:
-            drop = True
             self.__query('drop_index', index_name)
             return f'{index_name} dropped.'
         raise MongoIndexError(f'invalid index name - {index_name}')
