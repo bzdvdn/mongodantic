@@ -26,6 +26,24 @@ class TestBasicOperation(unittest.TestCase):
         Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
+    def test_get_or_create(self):
+        _, created = self.Ticket.querybuilder.get_or_create(
+            name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}
+        )
+        assert created is True
+        _, created = self.Ticket.querybuilder.get_or_create(
+            name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}
+        )
+        assert created is False
+
+    def test_update_or_create(self):
+        self.test_get_or_create()
+        obj, created = self.Ticket.querybuilder.update_or_create(
+            name='testerino1', position=222222, config={}, defaults={'array': [23, 23]}
+        )
+        assert created is False
+        assert obj.array[0] == 23
+
     def test_reconnect(self):
         old_connection = self.Ticket._connection._mongo_connection
         self.Ticket._reconnect()

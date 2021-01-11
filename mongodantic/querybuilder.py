@@ -292,6 +292,31 @@ class QueryBuilder(object):
         parsed_query = raw_query if isinstance(raw_query, tuple) else (raw_query,)
         return parsed_query
 
+    def get_or_create(self, **query) -> Tuple:
+        defaults = query.pop('defaults', {})
+        obj = self.find_one(**query)
+        if obj:
+            created = False
+        else:
+            created = True
+            inserted_id = self.insert_one(**{**query, **defaults})
+            obj = self.find_one(_id=inserted_id)
+        return obj, created
+
+    def update_or_create(self, **query) -> Tuple:
+        defaults = query.pop('defaults', {})
+        obj = self.find_one(**query)
+        if obj:
+            created = False
+            for field, value in defaults.items():
+                setattr(obj, field, value)
+            obj.save()
+        else:
+            created = True
+            inserted_id = self.insert_one(**{**query, **defaults})
+            obj = self.find_one(_id=inserted_id)
+        return obj, created
+
     def raw_query(
         self,
         method_name: str,
