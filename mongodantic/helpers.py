@@ -48,7 +48,7 @@ class cached_classproperty(classmethod):
         return self.obj[cls]
 
 
-class classproperty:
+class classproperty(classmethod):
     def __init__(self, method=None):
         self.fget = method
 

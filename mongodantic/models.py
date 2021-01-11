@@ -22,6 +22,7 @@ from .helpers import (
 )
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
+from mongodantic import querybuilder
 
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
@@ -34,14 +35,17 @@ class ModelMetaclass(PydanticModelMetaclass):
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         indexes = set()
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
-            querybuilder = QueryBuilder()
+            querybuilder = getattr(cls, '__querybuilder__')
+            if querybuilder is None:
+                querybuilder = QueryBuilder()
+                setattr(cls, '__querybuilder__', querybuilder)
             querybuilder.add_model(cls)
-            setattr(cls, '_querybuilder', querybuilder)
+            # setattr(cls, 'querybuilder', querybuilder)
             indexes = getattr(cls.__config__, 'indexes', [])
             if not all([isinstance(index, IndexModel) for index in indexes]):
                 raise ValueError('indexes must be list of IndexModel instances')
             if indexes:
-                db_indexes = cls._querybuilder.check_indexes()
+                db_indexes = cls.querybuilder.check_indexes()
                 indexes_to_create = [
                     i for i in indexes if i.document['name'] not in db_indexes
                 ]
@@ -52,11 +56,11 @@ class ModelMetaclass(PydanticModelMetaclass):
                 ]
                 result = []
                 if indexes_to_create:
-                    result = cls._querybuilder.create_indexes(indexes_to_create)
+                    result = cls.__querybuilder__.create_indexes(indexes_to_create)
                 if indexes_to_delete:
                     for index_name in indexes_to_delete:
-                        cls._querybuilder.drop_index(index_name)
-                    db_indexes = cls._querybuilder.check_indexes()
+                        cls.__querybuilder__.drop_index(index_name)
+                    db_indexes = cls.__querybuilder__.check_indexes()
                 indexes = set(list(db_indexes.keys()) + result)
         exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         setattr(cls, '__indexes__', indexes)
@@ -68,6 +72,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     __indexes__: Set['str'] = set()
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
+    __querybuilder__: Optional[QueryBuilder] = None
 
     def __setattr__(self, key, value):
         if key in self.__fields__:
@@ -194,16 +199,16 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
         cls.__connection__ = cls._get_connection()
 
     @classproperty
-    def _collection_name(cls):
+    def _collection_name(cls) -> str:
         return cls.set_collection_name()
 
     @classproperty
-    def _collection(cls):
+    def _collection(cls) -> Collection:
         return cls.get_collection()
 
-    @cached_classproperty
-    def querybuilder(cls):
-        return cls._querybuilder
+    @classproperty
+    def querybuilder(cls) -> Optional[QueryBuilder]:
+        return cls.__querybuilder__
 
 
 class MongoModel(BaseModel):
@@ -223,14 +228,16 @@ class MongoModel(BaseModel):
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
-            self.querybuilder.update_one(**data, session=session)
+            self.querybuilder.update_one(
+                session=session, **data,
+            )
             return self
         data = {
             field: value
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = self.querybuilder.insert_one(**data, session=session)
+        object_id = self.querybuilder.insert_one(session=session, **data,)
         self._id = object_id.__str__()
         return self
 
