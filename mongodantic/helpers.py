@@ -33,6 +33,7 @@ __all__ = (
     'bulk_query_generator',
     'generate_operator_for_multiply_aggregations',
     'cached_classproperty',
+    'classproperty',
 )
 
 

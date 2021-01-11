@@ -16,13 +16,11 @@ from .exceptions import (
 )
 from .helpers import (
     ExtraQueryMapper,
-    cached_classproperty,
-    _validate_value,
     classproperty,
+    _validate_value,
 )
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
-from mongodantic import querybuilder
 
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
