@@ -1,5 +1,5 @@
 import copy
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 
 __all__ = ("Query", "LogicalCombination")
@@ -17,12 +17,14 @@ class QueryNodeVisitor(object):
     """Base visitor class for visiting Query-object nodes in a query tree.
     """
 
-    def prepare_combination(self, combination):
+    def prepare_combination(
+        self, combination: 'LogicalCombination'
+    ) -> Union['LogicalCombination', dict]:
         """Called by LogicalCombination objects.
         """
         return combination
 
-    def visit_query(self, query):
+    def visit_query(self, query: 'Query') -> Union['Query', dict]:
         """Called by (New)Query objects.
         """
         return query
@@ -32,7 +34,9 @@ class SimplificationVisitor(QueryNodeVisitor):
     def __init__(self, model: Optional['MongoModel'] = None):
         self.model = model
 
-    def prepare_combination(self, combination: 'LogicalCombination'):
+    def prepare_combination(
+        self, combination: 'LogicalCombination'
+    ) -> Union['LogicalCombination', dict]:
         if combination.operation == combination.AND:
             # The simplification only applies to 'simple' queries
             if all(isinstance(node, Query) for node in combination.children):
@@ -60,13 +64,15 @@ class QueryCompilerVisitor(QueryNodeVisitor):
     def __init__(self, model):
         self.model = model
 
-    def prepare_combination(self, combination: 'LogicalCombination'):
+    def prepare_combination(
+        self, combination: 'LogicalCombination'
+    ) -> Union['LogicalCombination', dict]:
         operator = "$and"
         if combination.operation == combination.OR:
             operator = "$or"
         return {operator: combination.children}
 
-    def visit_query(self, query: 'Query') -> dict:
+    def visit_query(self, query: 'Query') -> Union['Query', dict]:
         data = parse_query(self.model, query.query)
         return data
 
@@ -130,7 +136,7 @@ class LogicalCombination(QueryNode):
     def __bool__(self):
         return bool(self.children)
 
-    def accept(self, visitor):
+    def accept(self, visitor) -> Union['LogicalCombination', dict]:
         for i in range(len(self.children)):
             if isinstance(self.children[i], QueryNode):
                 self.children[i] = self.children[i].accept(visitor)
@@ -166,7 +172,7 @@ class Query(QueryNode):
     def __eq__(self, other):
         return self.__class__ == other.__class__ and self.query == other.query
 
-    def accept(self, visit: 'QueryNodeVisitor') -> 'Query':
+    def accept(self, visit: 'QueryNodeVisitor') -> Union['Query', dict]:
         return visit.visit_query(self)
 
     @property

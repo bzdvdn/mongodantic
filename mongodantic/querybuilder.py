@@ -357,7 +357,7 @@ class QueryBuilder(object):
         method = getattr(self._mongo_model._collection, 'distinct')
         return method(key=field, filter=query)
 
-    def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None):
+    def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None) -> list:
         return list(self.__query("aggregate", data, session=session))
 
     def aggregate(self, *args, **query) -> dict:
@@ -401,22 +401,22 @@ class QueryBuilder(object):
             result_data.update({name: r} if name else r)
         return result_data
 
-    def aggregate_sum(self, agg_field: str, **query):
+    def aggregate_sum(self, agg_field: str, **query) -> dict:
         return self.aggregate(aggregation=Sum(agg_field), **query).get(
             f'{agg_field}__sum', 0
         )
 
-    def aggregate_max(self, agg_field: str, **query):
+    def aggregate_max(self, agg_field: str, **query) -> dict:
         return self.aggregate(aggregation=Max(agg_field), **query).get(
             f'{agg_field}__max', 0
         )
 
-    def aggregate_min(self, agg_field: str, **query):
+    def aggregate_min(self, agg_field: str, **query) -> dict:
         return self.aggregate(aggregation=Min(agg_field), **query).get(
             f'{agg_field}__min', 0
         )
 
-    def aggregate_avg(self, agg_field: str, **query):
+    def aggregate_avg(self, agg_field: str, **query) -> dict:
         return self.aggregate(aggregation=Avg(agg_field), **query).get(
             f'{agg_field}__avg', 0
         )

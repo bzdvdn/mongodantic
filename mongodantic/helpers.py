@@ -1,5 +1,6 @@
 from re import compile
 from typing import (
+    Generator,
     List,
     Any,
     Dict,
@@ -212,7 +213,7 @@ class ExtraQueryMapper(object):
         return methods
 
 
-def chunk_by_length(items: List, step: int):
+def chunk_by_length(items: List, step: int) -> Generator:
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(items), step):
         yield items[i : i + step]
@@ -275,7 +276,7 @@ def generate_lookup_project_params(
     return project_param
 
 
-def generate_name_field(name: Union[dict, str, None] = None):
+def generate_name_field(name: Union[dict, str, None] = None) -> Optional[str]:
     if isinstance(name, dict):
         return '|'.join(str(v) for v in name.values())
     return name
@@ -292,7 +293,9 @@ def sort_validation(
     return sort, sort_fields
 
 
-def group_by_aggregate_generation(group_by: Any) -> Any:
+def group_by_aggregate_generation(
+    group_by: Union[str, list, tuple]
+) -> Union[str, dict]:
     if isinstance(group_by, (list, tuple)):
         return {
             g if '.' not in g else g.split('.')[-1]: f'${g}' if '$' not in g else g

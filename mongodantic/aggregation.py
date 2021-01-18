@@ -1,4 +1,4 @@
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, Union, TYPE_CHECKING
 
 from .exceptions import ValidationError
 from .helpers import generate_lookup_project_params
@@ -148,13 +148,13 @@ class Lookup(object):
             raise AttributeError('invalid local_field')
         return self.local_field
 
-    def _combine(self, other) -> LookupCombination:
+    def _combine(self, other: Union[LookupCombination, 'Lookup']) -> LookupCombination:
         return LookupCombination([self, other])
 
     def accept(self, main_model: 'MongoModel', project: Optional[dict] = None) -> tuple:
         return LookupCombination([self]).accept(main_model, project)
 
-    def __and__(self, other):
+    def __and__(self, other: Union[LookupCombination, 'Lookup']) -> LookupCombination:
         return self._combine(other)
 
     def __repr__(self):

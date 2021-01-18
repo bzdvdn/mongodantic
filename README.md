@@ -1,7 +1,8 @@
 # mongodantic
 
-##ettings
+##settings
 in your main file application
+
 ```python
 from mongodantic import init_db_connection_params
 connection_str = '<your connection url>'
@@ -17,6 +18,7 @@ socket_timeout_ms = 50000 # pymongo socketTimeoutMS
 ```
 
 ## Declare models
+
 ```python
 from mongodantic.models import MongoModel
 
@@ -32,12 +34,13 @@ class Banner(MongoModel):
     @classmethod
     def set_collection_name(cls) -> str:
         return 'banner_test'
-    
+
 
 
 ```
 
 ## Queries
+
 ```python
 banner = Banner.querybuilder.find_one() # return a banner model obj
 # skip and limit
@@ -65,7 +68,7 @@ Banner.querybuilder.insert_many(banners) # list off models obj, or dicts
 Banner.querybuilder.bulk_create(banners, batch_size=1000) # insert_many with batch
 
 # update queries
-Banner.querybuilder.update_one(banner_id=1, name__set='updated') # parameters that end __set - been updated  
+Banner.querybuilder.update_one(banner_id=1, name__set='updated') # parameters that end __set - been updated
 Banner.querybuilder.update_many(name__set='update all names')
 
 # delete queries
