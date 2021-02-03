@@ -1,3 +1,4 @@
+from multiprocessing import current_process
 from json import dumps
 from typing import Dict, Any, Union, Optional, List, Tuple, Set
 from pymongo.client_session import ClientSession
@@ -151,7 +152,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _start_session(cls) -> ClientSession:
-        client = cls._connection._mongo_connection
+        client = cls.__connection__._mongo_connection
         return client.start_session()
 
     @classmethod
@@ -173,7 +174,11 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classproperty
     def _connection(cls):
+        cp = current_process()
         if not cls.__connection__:
+            cls.__connection__ = cls._get_connection()
+        if cp.name != 'MainProcess':
+            cls.__connection__._mongo_connection.close()
             cls.__connection__ = cls._get_connection()
         return cls.__connection__
 
