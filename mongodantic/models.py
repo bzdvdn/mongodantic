@@ -152,7 +152,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _start_session(cls) -> ClientSession:
-        client = cls.__connection__._mongo_connection
+        client = cls._connection._mongo_connection
         return client.start_session()
 
     @classmethod
