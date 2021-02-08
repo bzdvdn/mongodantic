@@ -26,6 +26,18 @@ class TestBasicOperation(unittest.TestCase):
         Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
 
+    def test_save(self):
+        self.test_get_or_create()
+        obj = self.Ticket.querybuilder.find_one(name='testerino1', position=222222)
+        obj.position = 2310
+        obj.name = 'updated'
+        obj.save()
+        none_obj = self.Ticket.querybuilder.find_one(name='testerino1', position=222222)
+        assert none_obj is None
+        obj = self.Ticket.querybuilder.find_one(_id=obj._id)
+        assert obj.name == 'updated'
+        assert obj.position == 2310
+
     def test_get_or_create(self):
         _, created = self.Ticket.querybuilder.get_or_create(
             name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}
@@ -201,11 +213,6 @@ class TestBasicOperation(unittest.TestCase):
         )
         assert isinstance(data_with_prejection, dict)
         assert data_with_prejection['position'] == 12
-
-    def test_save_method(self):
-        ticket = self.Ticket(name='save', position=123, config={})
-        ticket = ticket.save()
-        assert ticket.name == 'save'
 
     def test_delete_method(self):
         self.test_insert_one()
