@@ -34,6 +34,20 @@ class BasicDefaultAggregation(object):
         return query
 
 
+class Match(BasicDefaultAggregation):
+    def __init__(self, **query):
+        self.query = query
+
+    @property
+    def _operation(self) -> str:
+        return 'match'
+
+    def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:
+        validated_query = mongo_model._validate_query_data(self.query)
+
+        return validated_query
+
+
 class Sum(BasicDefaultAggregation):
     @property
     def _operation(self) -> str:
