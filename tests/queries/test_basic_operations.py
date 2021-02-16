@@ -1,9 +1,8 @@
 import unittest
-import multiprocessing
 
 from bson import ObjectId
 
-from mongodantic import init_db_connection_params, querybuilder
+from mongodantic import init_db_connection_params
 from mongodantic.models import MongoModel
 from mongodantic.session import Session
 
@@ -34,9 +33,9 @@ class TestBasicOperation(unittest.TestCase):
         obj.save()
         none_obj = self.Ticket.querybuilder.find_one(name='testerino1', position=222222)
         assert none_obj is None
-        obj = self.Ticket.querybuilder.find_one(_id=obj._id)
-        assert obj.name == 'updated'
-        assert obj.position == 2310
+        new_obj = self.Ticket.querybuilder.find_one(_id=obj._id)
+        assert new_obj.name == 'updated'
+        assert new_obj.position == 2310
 
     def test_get_or_create(self):
         _, created = self.Ticket.querybuilder.get_or_create(

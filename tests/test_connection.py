@@ -1,4 +1,5 @@
 import unittest
+import os
 from mongodantic import init_db_connection_params
 from mongodantic.connection import _connection_settings
 from mongodantic.db import _DBConnection
@@ -11,8 +12,9 @@ class TestWriteConnectionParams(unittest.TestCase):
         self.connection = _DBConnection()
 
     def test_connection_params(self):
-        db_name = _connection_settings['default'].get("dbname")
-        conn_string = _connection_settings['default'].get("connection_str")
+        pid = str(os.getpid())
+        db_name = _connection_settings[pid].get("dbname")
+        conn_string = _connection_settings[pid].get("connection_str")
         self.assertEqual(db_name, "test")
         self.assertEqual(conn_string, "mongodb://127.0.0.1:27017")
 

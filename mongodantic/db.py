@@ -1,5 +1,7 @@
+import os
 from pymongo import MongoClient, database
-from .connection import _connection_settings, DEFAULT_CONNECTION_NAME
+from .connection import _connection_settings
+from mongodantic import connection
 
 all = ('_DBConnection',)
 
@@ -8,7 +10,7 @@ _connections: dict = {}
 
 
 class _DBConnection(object):
-    def __init__(self, alias: str = DEFAULT_CONNECTION_NAME):
+    def __init__(self, alias: str = str(os.getpid())):
         self._alias = alias
         self.connection_string = _connection_settings[alias]['connection_str']
         self.db_name = _connection_settings[alias]['dbname']
@@ -20,9 +22,13 @@ class _DBConnection(object):
         ]
         self.connect_timeout_ms = _connection_settings[alias]['connect_timeout_ms']
         self.socket_timeout_ms = _connection_settings[alias]['socket_timeout_ms']
-        self._mongo_connection = self._init_mongo_connection()
-        self._database = None
-        _connections[alias] = self
+        if alias in _connections:
+            self._mongo_connection = _connections[alias]._mongo_connection
+            self._database = _connections[alias]._database
+        else:
+            self._mongo_connection = self._init_mongo_connection()
+            self._database = None
+            _connections[alias] = self
 
     def _init_mongo_connection(self, connect: bool = False) -> MongoClient:
         connection_params = dict(
@@ -40,8 +46,10 @@ class _DBConnection(object):
         return MongoClient(self.connection_string, **connection_params)
 
     def _reconnect(self):
-        del _connections[self.alias]
-        return self.__init__(self.alias)
+        old_connection = _connections.pop(self._alias)
+        old_connection._mongo_connection.close()
+        del old_connection
+        return self.__init__(self._alias)
 
     def get_database(self) -> database.Database:
         if hasattr(self, '_database') and self._database:

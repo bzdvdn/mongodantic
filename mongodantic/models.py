@@ -1,4 +1,4 @@
-from multiprocessing import current_process
+import os
 from json import dumps
 from typing import Dict, Any, Union, Optional, List, Tuple, Set
 from pymongo.client_session import ClientSession
@@ -170,15 +170,11 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _get_connection(cls):
-        return _DBConnection()
+        return _DBConnection(str(os.getpid()))
 
     @classproperty
     def _connection(cls):
-        cp = current_process()
         if not cls.__connection__:
-            cls.__connection__ = cls._get_connection()
-        if cp.name != 'MainProcess':
-            cls.__connection__._mongo_connection.close()
             cls.__connection__ = cls._get_connection()
         return cls.__connection__
 
@@ -198,7 +194,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     @classmethod
     def _reconnect(cls):
         if cls.__connection__:
-            cls.__connection__._mongo_connection.close()
+            cls.__connection__ = cls.__connection__._reconnect()
         cls.__connection__ = cls._get_connection()
 
     @classproperty
