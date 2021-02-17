@@ -1,8 +1,7 @@
 import unittest
-import pytest
-from mongodantic.logical import Query, LogicalCombination
+from mongodantic.logical import Query
 from mongodantic.models import MongoModel
-from mongodantic.db import init_db_connection_params
+from mongodantic.connection import init_db_connection_params
 
 
 class TestLogicalQuery(unittest.TestCase):
