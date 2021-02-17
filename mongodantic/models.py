@@ -22,6 +22,7 @@ from .helpers import (
 )
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
+from .connection import get_connection_env
 
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
@@ -170,7 +171,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _get_connection(cls):
-        return _DBConnection(str(os.getpid()))
+        return _DBConnection(alias=str(os.getpid()), env_name=get_connection_env())
 
     @classproperty
     def _connection(cls):

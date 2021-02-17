@@ -1,7 +1,7 @@
 import os
 from pymongo import MongoClient, database
 
-from .connection import _connection_settings
+from .connection import _connection_settings, DEFAULT_CONNECTION_NAME
 
 all = ('_DBConnection',)
 
@@ -10,18 +10,20 @@ _connections: dict = {}
 
 
 class _DBConnection(object):
-    def __init__(self, alias: str = str(os.getpid())):
+    def __init__(
+        self, alias: str = str(os.getpid()), env_name: str = DEFAULT_CONNECTION_NAME
+    ):
         self._alias = alias
-        self.connection_string = _connection_settings[alias]['connection_str']
-        self.db_name = _connection_settings[alias]['dbname']
-        self.max_pool_size = _connection_settings[alias]['pool_size']
-        self.ssl = _connection_settings[alias]['ssl']
-        self.ssl_cert_path = _connection_settings[alias]['ssl_cert_path']
-        self.server_selection_timeout_ms = _connection_settings[alias][
+        self.connection_string = _connection_settings[env_name]['connection_str']
+        self.db_name = _connection_settings[env_name]['dbname']
+        self.max_pool_size = _connection_settings[env_name]['pool_size']
+        self.ssl = _connection_settings[env_name]['ssl']
+        self.ssl_cert_path = _connection_settings[env_name]['ssl_cert_path']
+        self.server_selection_timeout_ms = _connection_settings[env_name][
             'server_selection_timeout_ms'
         ]
-        self.connect_timeout_ms = _connection_settings[alias]['connect_timeout_ms']
-        self.socket_timeout_ms = _connection_settings[alias]['socket_timeout_ms']
+        self.connect_timeout_ms = _connection_settings[env_name]['connect_timeout_ms']
+        self.socket_timeout_ms = _connection_settings[env_name]['socket_timeout_ms']
         if alias in _connections:
             self._mongo_connection = _connections[alias]._mongo_connection
             self._database = _connections[alias]._database
