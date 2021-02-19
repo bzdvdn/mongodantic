@@ -1,4 +1,6 @@
 from re import compile
+from time import sleep
+from types import GeneratorType
 from typing import (
     Generator,
     List,
@@ -249,19 +251,31 @@ def bulk_query_generator(
 
 
 def handle_and_convert_connection_errors(func: Callable) -> Any:
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except (
-            ServerSelectionTimeoutError,
-            AutoReconnect,
-            NetworkTimeout,
-            ConnectionFailure,
-            WriteConcernError,
-        ) as e:
-            raise MongoConnectionError(str(e))
+    def generator_wrapper(generator):
+        yield from generator
 
-    return wrapper
+    def main_wrapper(*args, **kwargs):
+        counter = 1
+        while True:
+            try:
+                result = func(*args, **kwargs)
+                if isinstance(result, GeneratorType):
+                    result = generator_wrapper(result)
+                return result
+            except (WriteConcernError,) as e:
+                raise MongoConnectionError(str(e))
+            except (
+                AutoReconnect,
+                ServerSelectionTimeoutError,
+                NetworkTimeout,
+                ConnectionFailure,
+            ) as e:
+                counter += 1
+                if counter > 5:
+                    raise MongoConnectionError(str(e))
+                sleep(counter)
+
+    return main_wrapper
 
 
 def generate_lookup_project_params(

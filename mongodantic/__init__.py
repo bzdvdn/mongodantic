@@ -5,6 +5,6 @@ from .connection import (
 )
 
 
-__version__ = '0.1.4b1'  # prerelease with rework connection by pids
+__version__ = '0.1.4b2'  # prerelease with rework handle connection errors
 
 __author__ = 'bzdvdn'

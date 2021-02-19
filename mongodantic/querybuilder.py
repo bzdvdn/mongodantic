@@ -3,19 +3,11 @@ from collections.abc import Iterable
 from pymongo import ReturnDocument
 from pymongo import IndexModel
 from pymongo.client_session import ClientSession
-from pymongo.errors import (
-    NetworkTimeout,
-    AutoReconnect,
-    ConnectionFailure,
-    WriteConcernError,
-    ServerSelectionTimeoutError,
-)
 from bson import ObjectId
 
 from .exceptions import (
     ValidationError,
     MongoIndexError,
-    MongoConnectionError,
 )
 from .helpers import (
     chunk_by_length,
@@ -23,6 +15,7 @@ from .helpers import (
     generate_name_field,
     sort_validation,
     group_by_aggregate_generation,
+    handle_and_convert_connection_errors,
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
@@ -37,6 +30,7 @@ class QueryBuilder(object):
         if not self._mongo_model:
             self._mongo_model = mongo_model
 
+    @handle_and_convert_connection_errors
     def __query(
         self,
         method_name: str,
@@ -47,7 +41,6 @@ class QueryBuilder(object):
         logical: bool = False,
         **kwargs,
     ) -> Any:
-        inner_query_params = query_params
         if logical:
             query_params = self._mongo_model._check_query_args(query_params)
         elif isinstance(query_params, dict):
@@ -59,30 +52,9 @@ class QueryBuilder(object):
             kwargs['session'] = session
         if set_values:
             query = [query_params, set_values]
-        try:
-            if kwargs:
-                return method(*query, **kwargs)
-            return method(*query)
-        except (
-            NetworkTimeout,
-            AutoReconnect,
-            ConnectionFailure,
-            WriteConcernError,
-            ServerSelectionTimeoutError,
-        ) as description:
-            if counter >= 5:
-                raise MongoConnectionError(str(description))
-            counter += 1
-            self._mongo_model._reconnect()
-            return self.__query(
-                method_name=method_name,
-                query_params=inner_query_params,
-                set_values=set_values,
-                session=session,
-                counter=counter,
-                logical=logical,
-                **kwargs,
-            )
+        if kwargs:
+            return method(*query, **kwargs)
+        return method(*query)
 
     def check_indexes(self) -> dict:
         index_list = list(self.__query('list_indexes', {}))
