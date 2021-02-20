@@ -175,7 +175,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classproperty
     def _connection(cls):
-        if not cls.__connection__:
+        if not cls.__connection__ or cls.__connection__._alias != str(os.getpid()):
             cls.__connection__ = cls._get_connection()
         return cls.__connection__
 
