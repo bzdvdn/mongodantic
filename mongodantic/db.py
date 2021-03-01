@@ -48,9 +48,7 @@ class _DBConnection(object):
         return MongoClient(self.connection_string, **connection_params)
 
     def _reconnect(self):
-        old_connection = _connections.pop(self._alias)
-        old_connection._mongo_connection.close()
-        del old_connection
+        self.close()
         return self.__init__(self._alias)
 
     def get_database(self) -> database.Database:
@@ -60,4 +58,10 @@ class _DBConnection(object):
         return self._database
 
     def close(self) -> None:
-        return self._mongo_connection.close()
+        old_connection = _connections.pop(self._alias, None)
+        if old_connection:
+            old_connection._mongo_connection.close()
+            del old_connection
+
+    def __del__(self):
+        self.close()
