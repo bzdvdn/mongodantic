@@ -3,7 +3,7 @@ from pymongo import MongoClient, database
 
 from .connection import _connection_settings, DEFAULT_CONNECTION_NAME
 
-all = ('_DBConnection',)
+all = ('_DBConnection', '_get_connection')
 
 
 _connections: dict = {}
@@ -24,13 +24,8 @@ class _DBConnection(object):
         ]
         self.connect_timeout_ms = _connection_settings[env_name]['connect_timeout_ms']
         self.socket_timeout_ms = _connection_settings[env_name]['socket_timeout_ms']
-        if alias in _connections:
-            self._mongo_connection = _connections[alias]._mongo_connection
-            self._database = _connections[alias]._database
-        else:
-            self._mongo_connection = self._init_mongo_connection()
-            self._database = None
-            _connections[alias] = self
+        self._mongo_connection = self._init_mongo_connection()
+        self._database = None
 
     def _init_mongo_connection(self, connect: bool = False) -> MongoClient:
         connection_params = dict(
@@ -65,3 +60,13 @@ class _DBConnection(object):
 
     def __del__(self):
         self.close()
+
+
+def _get_connection(
+    alias: str, env_name: str = DEFAULT_CONNECTION_NAME
+) -> _DBConnection:
+    connection = _connections.get(str(alias))
+    if not connection:
+        connection = _DBConnection(str(alias), env_name=env_name)
+        _connections[alias] = connection
+    return connection

@@ -8,7 +8,7 @@ from pydantic import BaseModel as BasePydanticModel
 from pymongo.collection import Collection
 from pymongo import IndexModel
 
-from .db import _DBConnection
+from .db import _DBConnection, _get_connection
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
@@ -171,7 +171,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _get_connection(cls):
-        return _DBConnection(alias=str(os.getpid()), env_name=get_connection_env())
+        return _get_connection(alias=str(os.getpid()), env_name=get_connection_env())
 
     @classproperty
     def _connection(cls):

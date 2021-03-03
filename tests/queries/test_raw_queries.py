@@ -5,7 +5,6 @@ from uuid import uuid4, UUID
 
 from mongodantic.models import MongoModel
 from mongodantic import init_db_connection_params
-from mongodantic.session import Session
 from mongodantic.exceptions import ValidationError
 
 
