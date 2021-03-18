@@ -22,6 +22,9 @@ class QuerySet(object):
         for obj in self._data:
             yield self._model.parse_obj(obj, self._reference_models)
 
+    def __next__(self):
+        return next(self.__iter__())
+
     @property
     def data(self) -> List:
         return [obj.data for obj in self.__iter__()]
