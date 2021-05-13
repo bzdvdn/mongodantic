@@ -37,7 +37,6 @@ class QueryBuilder(object):
         query_params: Union[List, Dict, str, Query, LogicalCombination],
         set_values: Optional[Dict] = None,
         session: Optional[ClientSession] = None,
-        counter: int = 1,
         logical: bool = False,
         **kwargs,
     ) -> Any:
@@ -167,13 +166,14 @@ class QueryBuilder(object):
 
     def insert_one(self, session: Optional[ClientSession] = None, **query) -> ObjectId:
         obj = self._mongo_model.parse_obj(query)
-        data = self.__query('insert_one', obj.data, session=session)
+        data = self.__query('insert_one', obj.query_data, session=session)
         return data.inserted_id
 
     def insert_many(self, data: List, session: Optional[ClientSession] = None) -> int:
         parse_obj = self._mongo_model.parse_obj
         query = [
-            parse_obj(obj).data if isinstance(obj, dict) else obj.data for obj in data
+            parse_obj(obj).query_data if isinstance(obj, dict) else obj.query_data
+            for obj in data
         ]
         r = self.__query('insert_many', query, session=session)
         return len(r.inserted_ids)
@@ -569,7 +569,7 @@ class QueryBuilder(object):
         **query,
     ) -> Any:
         if not isinstance(replacement, dict):
-            replacement = replacement.data
+            replacement = replacement.query_data
         return self._find_with_replacement_or_with_update(
             'find_and_replace',
             projection_fields=projection_fields,

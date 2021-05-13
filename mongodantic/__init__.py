@@ -5,6 +5,6 @@ from .connection import (
 )
 
 
-__version__ = '0.1.4b6'  # prerelease try to fix thread locks
+__version__ = '0.1.5b'
 
 __author__ = 'bzdvdn'

@@ -1,6 +1,6 @@
 import os
 from json import dumps
-from typing import Dict, Any, Union, Optional, List, Tuple, Set
+from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING
 from pymongo.client_session import ClientSession
 from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
@@ -24,6 +24,13 @@ from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
 from .connection import get_connection_env
 
+if TYPE_CHECKING:
+    from pydantic.types import ModelOrDc
+    from pydantic.typing import (
+        DictStrAny,
+        SetStr,
+    )
+    from pydantic.typing import AbstractSetIntStr  # noqa: F401
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
 
@@ -79,6 +86,26 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
             return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
+
+    @classmethod
+    def _get_properties(cls):
+        return [
+            prop
+            for prop in dir(cls)
+            if isinstance(getattr(cls, prop), property)
+            and prop
+            not in (
+                "__values__",
+                "fields",
+                "data",
+                "_connection",
+                "_collection_name",
+                "_collection",
+                "querybuilder",
+                "pk",
+                "query_data",
+            )
+        ]
 
     @classmethod
     def parse_obj(
@@ -162,12 +189,54 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
             new_sort = {field: cls.__fields__[field] for field in fields}
             cls.__fields__ = new_sort
 
-    @property
-    def data(self) -> Dict:
-        data = self.dict()
+    def dict(  # type: ignore
+        self,
+        *,
+        include: Union['AbstractSetIntStr'] = None,
+        exclude: Union['AbstractSetIntStr'] = None,
+        by_alias: bool = False,
+        skip_defaults: bool = None,
+        exclude_unset: bool = False,
+        exclude_defaults: bool = False,
+        exclude_none: bool = False,
+        with_props: bool = True,
+    ) -> 'DictStrAny':
+        attribs = super().dict(
+            include=include,
+            exclude=exclude,
+            by_alias=by_alias,
+            skip_defaults=skip_defaults,
+            exclude_unset=exclude_unset,
+            exclude_defaults=exclude_defaults,
+            exclude_none=exclude_none,
+        )
+        if with_props:
+            props = self._get_properties()
+            # Include and exclude properties
+            if include:
+                props = [prop for prop in props if prop in include]
+            if exclude:
+                props = [prop for prop in props if prop not in exclude]
+
+            # Update the attribute dict with the properties
+            if props:
+                attribs.update({prop: getattr(self, prop) for prop in props})
+
+        return attribs
+
+    def _data(self, with_props: bool = True) -> Dict:
+        data = self.dict(with_props=with_props)
         if '_id' in data:
             data['_id'] = data['_id'].__str__()
         return data
+
+    @property
+    def data(self) -> Dict:
+        return self._data(with_props=True)
+
+    @property
+    def query_data(self) -> Dict:
+        return self._data(with_props=False)
 
     @classmethod
     def _get_connection(cls):
