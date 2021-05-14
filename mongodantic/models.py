@@ -6,7 +6,7 @@ from bson import ObjectId
 from pydantic.main import ModelMetaclass as PydanticModelMetaclass
 from pydantic import BaseModel as BasePydanticModel
 from pymongo.collection import Collection
-from pymongo import IndexModel
+from pymongo import IndexModel, database
 
 from .db import _DBConnection, _get_connection
 from .types import ObjectIdStr
@@ -25,11 +25,7 @@ from .logical import LogicalCombination, Query
 from .connection import get_connection_env
 
 if TYPE_CHECKING:
-    from pydantic.types import ModelOrDc
-    from pydantic.typing import (
-        DictStrAny,
-        SetStr,
-    )
+    from pydantic.typing import DictStrAny
     from pydantic.typing import AbstractSetIntStr  # noqa: F401
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
@@ -92,8 +88,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
         return [
             prop
             for prop in dir(cls)
-            if isinstance(getattr(cls, prop), property)
-            and prop
+            if prop
             not in (
                 "__values__",
                 "fields",
@@ -104,7 +99,9 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
                 "querybuilder",
                 "pk",
                 "query_data",
+                "all_fields",
             )
+            and isinstance(getattr(cls, prop), property)
         ]
 
     @classmethod
@@ -169,6 +166,12 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
                 field = f'{field}.{".".join(i for i in inners)}'
             data[field] = value
         return data
+
+    @classproperty
+    def all_fields(cls) -> list:
+        fields = list(cls.__fields__.keys())
+        return_fields = fields + cls._get_properties()
+        return return_fields
 
     @classmethod
     def _check_query_args(
@@ -239,17 +242,17 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
         return self._data(with_props=False)
 
     @classmethod
-    def _get_connection(cls):
+    def _get_connection(cls) -> _DBConnection:
         return _get_connection(alias=str(os.getpid()), env_name=get_connection_env())
 
     @classproperty
-    def _connection(cls):
+    def _connection(cls) -> Optional[_DBConnection]:
         if not cls.__connection__ or cls.__connection__._alias != str(os.getpid()):
             cls.__connection__ = cls._get_connection()
         return cls.__connection__
 
     @classmethod
-    def get_database(cls):
+    def get_database(cls) -> database.Database:
         return cls._connection.get_database()
 
     @classmethod
