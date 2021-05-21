@@ -20,6 +20,7 @@ from .helpers import (
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .aggregation import Lookup, LookupCombination, Sum, Max, Min, Avg
+from .exceptions import DoesNotExist
 
 
 class QueryBuilder(object):
@@ -241,6 +242,25 @@ class QueryBuilder(object):
             upsert=upsert,
             session=session,
         )
+
+    def get(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Optional[Union[tuple, list]] = None,
+        sort: Optional[int] = None,
+        **query,
+    ) -> Any:
+        obj = self.find_one(
+            logical_query=logical_query,
+            session=session,
+            sort_fields=sort_fields,
+            sort=sort,
+            **query,
+        )
+        if not obj:
+            raise DoesNotExist(self._mongo_model.__name__)
+        return obj
 
     def __validate_raw_query(
         self, method_name: str, raw_query: Union[Dict, List[Dict], Tuple[Dict]]

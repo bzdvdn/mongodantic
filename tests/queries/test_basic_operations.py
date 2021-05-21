@@ -1,10 +1,11 @@
 import unittest
-
+import pytest
 from bson import ObjectId
 
 from mongodantic import init_db_connection_params
 from mongodantic.models import MongoModel
 from mongodantic.session import Session
+from mongodantic.exceptions import DoesNotExist
 
 
 class TestBasicOperation(unittest.TestCase):
@@ -156,6 +157,17 @@ class TestBasicOperation(unittest.TestCase):
         assert isinstance(data, list)
         assert len(data) == 2
         assert isinstance(data[0], MongoModel)
+
+    def test_get(self):
+        self.test_insert_one()
+        data = self.Ticket.querybuilder.get(name='first')
+        second = self.Ticket.querybuilder.get(_id=data._id)
+        assert isinstance(data, MongoModel)
+        assert data.name == 'first'
+        assert data.position == 1
+        assert second._id == data._id
+        with pytest.raises(DoesNotExist):
+            _ = self.Ticket.querybuilder.get(name='invalid_name')
 
     def test_distinct(self):
         self.test_insert_many()

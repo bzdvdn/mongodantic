@@ -35,3 +35,12 @@ class DuplicateQueryParamError(BaseMongodanticException):
 class InvalidArgsParams(BaseMongodanticException):
     def __str__(self):
         return 'Arguments must be Query objects'
+
+
+class DoesNotExist(BaseMongodanticException):
+    def __init__(self, model_name: str, *args):
+        super().__init__(args)
+        self.model_name = model_name
+
+    def __str__(self):
+        return f'row does not exist for model: {self.model_name}'
