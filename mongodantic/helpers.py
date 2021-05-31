@@ -65,15 +65,18 @@ class classproperty(classmethod):
 
 
 def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
-    field = cls.__fields__.get(field_name)
-    if not field:
-        raise AttributeError(f'invalid field - {field_name}')
+    if field_name == '_id':
+        field = ObjectIdStr()
+    else:
+        field = cls.__fields__.get(field_name)
     error_ = None
     if isinstance(field, ObjectIdStr):
         try:
             value = field.validate(value)
         except ValueError as e:
             error_ = e
+    elif not field:
+        raise AttributeError(f'invalid field - {field_name}')
     else:
         value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
     if error_:

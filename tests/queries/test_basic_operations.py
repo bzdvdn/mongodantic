@@ -193,6 +193,10 @@ class TestBasicOperation(unittest.TestCase):
         self.test_insert_many()
         deleted = self.Ticket.querybuilder.delete_many(position=2)
         assert deleted == 2
+        self.test_insert_many()
+        items = self.Ticket.querybuilder.find().list
+        deleted = self.Ticket.querybuilder.delete_many(_id__in=[i._id for i in items])
+        assert deleted == 2
 
     def test_update_one(self):
         self.test_insert_one()
