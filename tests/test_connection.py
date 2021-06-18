@@ -1,7 +1,7 @@
 import unittest
 import os
 from mongodantic import init_db_connection_params
-from mongodantic.db import _DBConnection, _connection_settings
+from mongodantic.connection import _DBConnection, _connection_settings
 from mongodantic.connection import DEFAULT_CONNECTION_NAME
 from pymongo import MongoClient
 

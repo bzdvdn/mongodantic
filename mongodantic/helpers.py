@@ -1,4 +1,4 @@
-from re import compile
+from re import compile, IGNORECASE
 from time import sleep
 from types import GeneratorType
 from typing import (
@@ -66,9 +66,9 @@ class classproperty(classmethod):
 
 def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
     if field_name == '_id':
-        field = ObjectIdStr()
+        field = ObjectIdStr()  # type: ignore
     else:
-        field = cls.__fields__.get(field_name)
+        field = cls.__fields__.get(field_name)  # type: ignore
     error_ = None
     if isinstance(field, ObjectIdStr):
         try:
@@ -141,6 +141,9 @@ class ExtraQueryMapper(object):
 
     def not_startswith(self, value: str) -> dict:
         return {"$not": compile(f"^{value}")}
+
+    def not_istartswith(self, value: str) -> dict:
+        return {"$not": compile(f"^{value}", IGNORECASE)}
 
     def endswith(self, value: str) -> dict:
         return {"$regex": f"{value}$"}

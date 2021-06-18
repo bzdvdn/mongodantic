@@ -1,12 +1,12 @@
 import unittest
 from mongodantic.logical import Query
 from mongodantic.models import MongoModel
-from mongodantic.connection import init_db_connection_params
+from mongodantic.connection import connect
 
 
 class TestLogicalQuery(unittest.TestCase):
     def setUp(self):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
             name: str

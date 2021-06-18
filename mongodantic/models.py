@@ -8,7 +8,7 @@ from pydantic import BaseModel as BasePydanticModel
 from pymongo.collection import Collection
 from pymongo import IndexModel, database
 
-from .db import _DBConnection, _get_connection
+from .connection import _DBConnection, _get_connection
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
