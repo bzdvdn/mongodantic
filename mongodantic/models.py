@@ -22,7 +22,7 @@ from .helpers import (
 )
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
-from .connection import get_connection_env
+from .connection import get_connection_env, _connections
 
 if TYPE_CHECKING:
     from pydantic.typing import DictStrAny
@@ -44,27 +44,7 @@ class ModelMetaclass(PydanticModelMetaclass):
                 setattr(cls, '__querybuilder__', querybuilder)
             querybuilder.add_model(cls)
             # setattr(cls, 'querybuilder', querybuilder)
-            indexes = getattr(cls.__config__, 'indexes', [])
-            if not all([isinstance(index, IndexModel) for index in indexes]):
-                raise ValueError('indexes must be list of IndexModel instances')
-            if indexes:
-                db_indexes = cls.querybuilder.check_indexes()
-                indexes_to_create = [
-                    i for i in indexes if i.document['name'] not in db_indexes
-                ]
-                indexes_to_delete = [
-                    i
-                    for i in db_indexes
-                    if i not in [i.document['name'] for i in indexes] and i != '_id_'
-                ]
-                result = []
-                if indexes_to_create:
-                    result = cls.__querybuilder__.create_indexes(indexes_to_create)
-                if indexes_to_delete:
-                    for index_name in indexes_to_delete:
-                        cls.__querybuilder__.drop_index(index_name)
-                    db_indexes = cls.__querybuilder__.check_indexes()
-                indexes = set(list(db_indexes.keys()) + result)
+
         exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         setattr(cls, '__indexes__', indexes)
         setattr(cls, '__exclude_fields__', exclude_fields)
@@ -76,12 +56,6 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
     __querybuilder__: Optional[QueryBuilder] = None
-
-    def __setattr__(self, key, value):
-        if key in self.__fields__:
-            return super().__setattr__(key, value)
-        self.__dict__[key] = value
-        return value
 
     @classmethod
     def _get_properties(cls):
@@ -285,6 +259,37 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
 class MongoModel(BaseModel):
     _id: Optional[ObjectIdStr] = None
+
+    def __setattr__(self, key, value):
+        if key in self.__fields__:
+            return super().__setattr__(key, value)
+        self.__dict__[key] = value
+        return value
+
+    @classmethod
+    def execute_indexes(cls):
+        indexes = getattr(cls.__config__, 'indexes', [])
+        if not all([isinstance(index, IndexModel) for index in indexes]):
+            raise ValueError('indexes must be list of IndexModel instances')
+        if indexes:
+            db_indexes = cls.querybuilder.check_indexes()
+            indexes_to_create = [
+                i for i in indexes if i.document['name'] not in db_indexes
+            ]
+            indexes_to_delete = [
+                i
+                for i in db_indexes
+                if i not in [i.document['name'] for i in indexes] and i != '_id_'
+            ]
+            result = []
+            if indexes_to_create:
+                result = cls.__querybuilder__.create_indexes(indexes_to_create)
+            if indexes_to_delete:
+                for index_name in indexes_to_delete:
+                    cls.__querybuilder__.drop_index(index_name)
+                db_indexes = cls.__querybuilder__.check_indexes()
+            indexes = set(list(db_indexes.keys()) + result)
+        setattr(cls, '__indexes__', indexes)
 
     def save(
         self,

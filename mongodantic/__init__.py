@@ -6,6 +6,4 @@ from .connection import (
 )
 
 
-__version__ = '0.1.5b4'
-
 __author__ = 'bzdvdn'

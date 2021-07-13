@@ -1,8 +1,6 @@
 from io import open
 from setuptools import setup, find_packages
 
-from mongodantic import __version__
-
 
 def read(f):
     return open(f, "r").read()
@@ -10,7 +8,7 @@ def read(f):
 
 setup(
     name="mongodantic",
-    version=__version__,
+    version='0.1.6b0',
     packages=find_packages(exclude=("tests",)),
     install_requires=["pydantic>=1.3,<2", "pymongo>=3.10.1,<3.11",],
     description="Mongo ODM, based on pydantic",

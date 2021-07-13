@@ -52,6 +52,8 @@ class _DBConnection(object):
         self, alias: str = str(os.getpid()), env_name: str = DEFAULT_CONNECTION_NAME
     ):
         self._alias = alias
+        if env_name not in _connection_settings:
+            raise RuntimeError('not execute `connect` or not connection settings')
         self.connection_string = _connection_settings[env_name]['connection_str']
         self.db_name = _connection_settings[env_name]['dbname']
         self.max_pool_size = _connection_settings[env_name]['pool_size']
