@@ -25,6 +25,7 @@ class TestIndexOperation(unittest.TestCase):
         if drop:
             Ticket.querybuilder.drop_collection(force=True)
         self.Ticket = Ticket
+        self.Ticket.execute_indexes()
 
     def test_check_indexes(self):
         self.setUp(False)

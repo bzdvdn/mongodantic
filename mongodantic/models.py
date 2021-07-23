@@ -56,6 +56,7 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
     __querybuilder__: Optional[QueryBuilder] = None
+    _id: Optional[ObjectIdStr] = None
 
     @classmethod
     def _get_properties(cls):
@@ -258,8 +259,6 @@ class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
 
 
 class MongoModel(BaseModel):
-    _id: Optional[ObjectIdStr] = None
-
     def __setattr__(self, key, value):
         if key in self.__fields__:
             return super().__setattr__(key, value)
