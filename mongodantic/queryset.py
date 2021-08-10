@@ -48,8 +48,14 @@ class QuerySet(object):
     def first(self) -> Any:
         return next(self.__iter__())
 
-    def serialize(self, fields: Union[tuple, List]) -> List:
-        return [obj.serialize(fields) for obj in self.__iter__()]
+    def serialize(
+        self, fields: Union[tuple, List], to_list: bool = True
+    ) -> Union[tuple, list]:
+        return (
+            [obj.serialize(fields) for obj in self.__iter__()]
+            if to_list
+            else tuple(obj.serialize(fields) for obj in self.__iter__())
+        )
 
     def serialize_generator(self, fields: Union[tuple, List]) -> Generator:
         for obj in self.__iter__():

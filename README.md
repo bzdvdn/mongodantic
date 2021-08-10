@@ -1,16 +1,27 @@
 # mongodantic
 
+## Install
+
+Install using `pip`...
+
+    pip install mongodantic
+
 ##settings
+
 in your main file application
 
 ```python
-from mongodantic import init_db_connection_params
+from mongodantic import connect
+
 connection_str = '<your connection url>'
 db_name = '<name of database>'
+
 # basic
-init_db_connection_params(connection_str, db_name, max_pool_size=100)
+connect(connection_str, db_name, max_pool_size=100)
+
 # if u use ssl
-init_db_connection_params(connection_str, db_name, max_pool_size=100, ssl=True, ssl_cert_path='<path to cert>')
+connect(connection_str, db_name, max_pool_size=100, ssl=True, ssl_cert_path='<path to cert>')
+
 # extra params
 server_selection_timeout_ms = 50000 # pymongo serverSelectionTimeoutMS
 connect_timeout_ms = 50000 # pymongo connectTimeoutMS
@@ -136,13 +147,13 @@ class Stats(MongoModel):
 
 from mongodantic.aggregation import Sum, Min, Max
 
-Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Sum('cost'))
-Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Min('clicks'))
-Stats.querybuilder.aggregate(date='2020-01-20', aggregation=Max('shows'))
+Stats.querybuilder.simple_aggregate(date='2020-01-20', aggregation=Sum('cost'))
+Stats.querybuilder.simple_aggregate(date='2020-01-20', aggregation=Min('clicks'))
+Stats.querybuilder.simple_aggregate(date='2020-01-20', aggregation=Max('shows'))
 
 # sessions
 from mongodantic.session import Session
-with Session() as session:
+with Session(Banner) as session:
     Banner.querybuilder.find(skip_rows=1, limit_rows=1, session=session).data
 
 

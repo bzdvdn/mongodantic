@@ -244,7 +244,7 @@ class TestBasicOperation(unittest.TestCase):
 
     # def test_session_with_transaction(self):
 
-    #     with Session() as session:
+    #     with Session(self.Ticket) as session:
     #         with session.start_transaction():
     #             result = self.Ticket.querybuilder.insert_one(
     #                 name='last', position=33333, config={}, session=session

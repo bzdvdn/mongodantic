@@ -284,18 +284,6 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
     return main_wrapper
 
 
-def generate_lookup_project_params(
-    main_model: BasePydanticModel, reference_models: Dict[str, BasePydanticModel]
-) -> Dict:
-    project_param = {f: 1 for f in main_model.__fields__}
-    project_param['_id'] = 1
-    for as_, reference_model in reference_models.items():
-        project_param.update(
-            {f'{as_}.{f}': 1 for f in ['_id'] + list(reference_model.__fields__.keys())}
-        )
-    return project_param
-
-
 def generate_name_field(name: Union[dict, str, None] = None) -> Optional[str]:
     if isinstance(name, dict):
         return '|'.join(str(v) for v in name.values())

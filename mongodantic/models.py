@@ -1,5 +1,6 @@
 import os
 from json import dumps
+from abc import ABC
 from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING
 from pymongo.client_session import ClientSession
 from bson import ObjectId
@@ -22,7 +23,7 @@ from .helpers import (
 )
 from .querybuilder import QueryBuilder
 from .logical import LogicalCombination, Query
-from .connection import get_connection_env, _connections
+from .connection import get_connection_env
 
 if TYPE_CHECKING:
     from pydantic.typing import DictStrAny
@@ -51,7 +52,7 @@ class ModelMetaclass(PydanticModelMetaclass):
         return cls
 
 
-class BaseModel(BasePydanticModel, metaclass=ModelMetaclass):
+class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
     __indexes__: Set['str'] = set()
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None

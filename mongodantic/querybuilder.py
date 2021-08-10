@@ -19,7 +19,7 @@ from .helpers import (
 )
 from .queryset import QuerySet
 from .logical import LogicalCombination, Query
-from .aggregation import Lookup, LookupCombination, Sum, Max, Min, Avg
+from .aggregation import Sum, Max, Min, Avg
 from .exceptions import DoesNotExist
 
 
@@ -347,12 +347,12 @@ class QueryBuilder(object):
     ) -> Union[list, dict]:
         query = self._mongo_model._validate_query_data(query)
         method = getattr(self._mongo_model._collection, 'distinct')
-        return method(key=field, filter=query)
+        return method(key=field, filter=query, session=session)
 
     def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None) -> list:
         return list(self.__query("aggregate", data, session=session))
 
-    def aggregate(self, *args, **query) -> dict:
+    def _aggregate(self, *args, **query) -> dict:
         session = query.pop('session', None)
         aggregation = query.pop('aggregation', None)
         group_by = query.pop('group_by', None)
@@ -393,61 +393,28 @@ class QueryBuilder(object):
             result_data.update({name: r} if name else r)
         return result_data
 
+    def simple_aggregate(self, *args, **kwargs):
+        return self._aggregate(*args, **kwargs)
+
     def aggregate_sum(self, agg_field: str, **query) -> dict:
-        return self.aggregate(aggregation=Sum(agg_field), **query).get(
+        return self._aggregate(aggregation=Sum(agg_field), **query).get(
             f'{agg_field}__sum', 0
         )
 
     def aggregate_max(self, agg_field: str, **query) -> dict:
-        return self.aggregate(aggregation=Max(agg_field), **query).get(
+        return self._aggregate(aggregation=Max(agg_field), **query).get(
             f'{agg_field}__max', 0
         )
 
     def aggregate_min(self, agg_field: str, **query) -> dict:
-        return self.aggregate(aggregation=Min(agg_field), **query).get(
+        return self._aggregate(aggregation=Min(agg_field), **query).get(
             f'{agg_field}__min', 0
         )
 
     def aggregate_avg(self, agg_field: str, **query) -> dict:
-        return self.aggregate(aggregation=Avg(agg_field), **query).get(
+        return self._aggregate(aggregation=Avg(agg_field), **query).get(
             f'{agg_field}__avg', 0
         )
-
-    def aggregate_lookup(
-        self,
-        logical_query: Union[Query, LogicalCombination, None] = None,
-        lookup: Union[Lookup, LookupCombination, None] = None,
-        project: Optional[dict] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
-        sort: Optional[int] = None,
-        skip_rows: Optional[int] = None,
-        limit_rows: Optional[int] = None,
-        session: Optional[ClientSession] = None,
-        **query,
-    ) -> Union[QuerySet, list]:
-        if not lookup:
-            raise ValueError('invalid lookup param')
-        query_params = [
-            {
-                '$match': self._mongo_model._check_query_args(logical_query)
-                if logical_query
-                else self._mongo_model._validate_query_data(query)
-            }
-        ]
-        accepted_lookup, reference_models = lookup.accept(self._mongo_model, project)
-        query_params.extend(accepted_lookup)
-        if sort_fields:
-            query_params.append({'$sort': {sf: sort for sf in sort_fields}})
-        if limit_rows:
-            query_params.append({'$limit': limit_rows})
-        data = self.__query(
-            "aggregate", query_params, session=session, logical=bool(logical_query)
-        )
-        if skip_rows:
-            data = data.skip(skip_rows)
-        if project:
-            return list(data)
-        return QuerySet(self._mongo_model, data, reference_models)
 
     def _bulk_operation(
         self,
