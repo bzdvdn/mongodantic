@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Generator, List, Optional, Union, Any
+from typing import Generator, List, Optional, Union, Any, Tuple, List
 from pydantic.main import ModelMetaclass
 
 
@@ -49,17 +49,17 @@ class QuerySet(object):
         return next(self.__iter__())
 
     def serialize(
-        self, fields: Union[tuple, List], to_list: bool = True
-    ) -> Union[tuple, list]:
+        self, fields: Union[Tuple, List], to_list: bool = True
+    ) -> Union[Tuple, List]:
         return (
             [obj.serialize(fields) for obj in self.__iter__()]
             if to_list
             else tuple(obj.serialize(fields) for obj in self.__iter__())
         )
 
-    def serialize_generator(self, fields: Union[tuple, List]) -> Generator:
+    def serialize_generator(self, fields: Union[Tuple, List]) -> Generator:
         for obj in self.__iter__():
             yield obj.serialize(fields)
 
-    def serialize_json(self, fields: Union[tuple, List]) -> str:
+    def serialize_json(self, fields: Union[Tuple, List]) -> str:
         return dumps(self.serialize(fields))

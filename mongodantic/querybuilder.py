@@ -101,7 +101,7 @@ class QueryBuilder(object):
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
     ) -> Any:
@@ -124,7 +124,7 @@ class QueryBuilder(object):
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
@@ -149,7 +149,7 @@ class QueryBuilder(object):
         skip_rows: Optional[int] = None,
         limit_rows: Optional[int] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
     ) -> tuple:
@@ -247,7 +247,7 @@ class QueryBuilder(object):
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
     ) -> Any:
@@ -493,7 +493,7 @@ class QueryBuilder(object):
         self,
         operation: str,
         projection_fields: Optional[list] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
@@ -526,7 +526,7 @@ class QueryBuilder(object):
     def find_one_and_update(
         self,
         projection_fields: Optional[list] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         upsert: bool = False,
         session: Optional[ClientSession] = None,
@@ -549,7 +549,7 @@ class QueryBuilder(object):
         self,
         replacement: Union[dict, Any],
         projection_fields: Optional[list] = None,
-        sort_fields: Optional[Union[tuple, list]] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         upsert: bool = False,
         session: Optional[ClientSession] = None,

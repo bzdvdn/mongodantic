@@ -163,7 +163,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return client.start_session()
 
     @classmethod
-    def sort_fields(cls, fields: Union[tuple, list, None]) -> None:
+    def sort_fields(cls, fields: Union[Tuple, List, None]) -> None:
         if fields:
             new_sort = {field: cls.__fields__[field] for field in fields}
             cls.__fields__ = new_sort
@@ -324,11 +324,11 @@ class MongoModel(BaseModel):
     def drop(self, session: Optional[ClientSession] = None) -> None:
         return self.delete(session)
 
-    def serialize(self, fields: Union[tuple, list]) -> dict:
+    def serialize(self, fields: Union[Tuple, List]) -> dict:
         data = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
 
-    def serialize_json(self, fields: Union[tuple, list]) -> str:
+    def serialize_json(self, fields: Union[Tuple, List]) -> str:
         return dumps(self.serialize(fields))
 
     def __hash__(self):
