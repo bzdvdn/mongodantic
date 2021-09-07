@@ -1,26 +1,23 @@
 from json import dumps
-from typing import Generator, List, Optional, Union, Any, Tuple, List
-from pydantic.main import ModelMetaclass
-
+from typing import Generator, List, Optional, Union, Any, Tuple, List, TYPE_CHECKING
 
 from .helpers import handle_and_convert_connection_errors
+
+if TYPE_CHECKING:
+    from .models import MongoModel
 
 
 class QuerySet(object):
     def __init__(
-        self,
-        model: ModelMetaclass,
-        data: Generator,
-        reference_models: Optional[List[ModelMetaclass]] = None,
+        self, model: 'MongoModel', data: Generator,
     ):
         self._data = data
         self._model = model
-        self._reference_models = reference_models
 
     @handle_and_convert_connection_errors
     def __iter__(self):
         for obj in self._data:
-            yield self._model.parse_obj(obj, self._reference_models)
+            yield self._model.parse_obj(obj)
 
     def __next__(self):
         return next(self.__iter__())

@@ -1,5 +1,6 @@
-from typing import Union, List, Dict, Optional, Any, Tuple
+from typing import Union, List, Dict, Optional, Any, Tuple, TYPE_CHECKING
 from collections.abc import Iterable
+from abc import ABC
 from pymongo import ReturnDocument
 from pymongo import IndexModel
 from pymongo.client_session import ClientSession
@@ -22,10 +23,13 @@ from .logical import LogicalCombination, Query
 from .aggregation import Sum, Max, Min, Avg
 from .exceptions import DoesNotExist
 
+if TYPE_CHECKING:
+    from .models import MongoModel
 
-class QueryBuilder(object):
-    def __init__(self):
-        self._mongo_model = None
+
+class BaseQueryBuilder(ABC):
+    def __init__(self, mongo_model: 'MongoModel'):
+        self._mongo_model = mongo_model
 
     def add_model(self, mongo_model):
         if not self._mongo_model:
@@ -259,7 +263,7 @@ class QueryBuilder(object):
             **query,
         )
         if not obj:
-            raise DoesNotExist(self._mongo_model.__name__)
+            raise DoesNotExist(self._mongo_model.__name__) #type: ignore
         return obj
 
     def __validate_raw_query(
@@ -571,14 +575,22 @@ class QueryBuilder(object):
         )
 
     def drop_collection(self, force: bool = False) -> str:
-        drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'
+        drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'  # type: ignore
         if force:
             self.__query('drop', query_params={})
             return drop_message
         value = input(
-            f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'
+            f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'  # type: ignore
         )
         if value.lower() == 'y':
             self.__query('drop', query_params={})
             return drop_message
         return 'nope'
+
+
+class QueryBuilder(BaseQueryBuilder):
+    pass
+
+
+class AsyncQueryBuilder(BaseQueryBuilder):
+    pass

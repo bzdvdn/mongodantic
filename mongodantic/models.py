@@ -21,7 +21,7 @@ from .helpers import (
     classproperty,
     _validate_value,
 )
-from .querybuilder import QueryBuilder
+from .querybuilder import QueryBuilder, AsyncQueryBuilder
 from .logical import LogicalCombination, Query
 from .connection import get_connection_env
 
@@ -40,10 +40,13 @@ class ModelMetaclass(PydanticModelMetaclass):
         indexes = set()
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
             querybuilder = getattr(cls, '__querybuilder__')
+            async_querybuilder = getattr(cls, '__aquerybuilder__')
             if querybuilder is None:
-                querybuilder = QueryBuilder()
+                querybuilder = QueryBuilder(cls)
                 setattr(cls, '__querybuilder__', querybuilder)
-            querybuilder.add_model(cls)
+            if async_querybuilder is None:
+                async_querybuilder = AsyncQueryBuilder(cls)
+                setattr(cls, '__aquerybuilder__', async_querybuilder)
             # setattr(cls, 'querybuilder', querybuilder)
 
         exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
@@ -57,7 +60,14 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
     __querybuilder__: Optional[QueryBuilder] = None
+    __aquerybuilder__: Optional[AsyncQueryBuilder] = None
     _id: Optional[ObjectIdStr] = None
+
+    def __setattr__(self, key, value):
+        if key in self.__fields__:
+            return super().__setattr__(key, value)
+        self.__dict__[key] = value
+        return value
 
     @classmethod
     def _get_properties(cls):
@@ -81,27 +91,10 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         ]
 
     @classmethod
-    def parse_obj(
-        cls, data: Any, reference_models: Dict[Any, 'BaseModel'] = {},
-    ) -> Any:
+    def parse_obj(cls, data: Any) -> Any:
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = data['_id']
-        if reference_models:
-            obj = cls.__set_reference_fields(obj, data, reference_models)
-        return obj
-
-    @classmethod
-    def __set_reference_fields(
-        cls, obj: 'BaseModel', data: Dict, reference_models: Dict[Any, 'BaseModel'],
-    ) -> 'BaseModel':
-        for name_as, ref in reference_models.items():
-            data = data[name_as]
-            if isinstance(data, dict):
-                ref_obj = ref.parse_obj(data)
-            else:
-                ref_obj = [ref.parse_obj(d) for d in data]
-            setattr(obj, f'{name_as}', ref_obj)
         return obj
 
     @classmethod
@@ -151,7 +144,10 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def _check_query_args(
-        cls, logical_query: Union[Query, LogicalCombination, None] = None
+        cls,
+        logical_query: Union[
+            List[Any], Dict[Any, Any], str, Query, LogicalCombination
+        ] = None,
     ) -> Dict:
         if not isinstance(logical_query, (LogicalCombination, Query)):
             raise InvalidArgsParams()
@@ -255,16 +251,20 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return cls.get_collection()
 
     @classproperty
-    def querybuilder(cls) -> Optional[QueryBuilder]:
+    def q(cls) -> Optional[QueryBuilder]:
         return cls.__querybuilder__
 
+    @classproperty
+    def aq(cls) -> Optional[AsyncQueryBuilder]:
+        return cls.__aquerybuilder__
 
-class MongoModel(BaseModel):
-    def __setattr__(self, key, value):
-        if key in self.__fields__:
-            return super().__setattr__(key, value)
-        self.__dict__[key] = value
-        return value
+    @classproperty
+    def querybuilder(cls) -> Optional[QueryBuilder]:
+        return cls.q
+
+    @classproperty
+    def async_querybuilder(cls) -> Optional[AsyncQueryBuilder]:
+        return cls.aq
 
     @classmethod
     def execute_indexes(cls):
@@ -272,7 +272,7 @@ class MongoModel(BaseModel):
         if not all([isinstance(index, IndexModel) for index in indexes]):
             raise ValueError('indexes must be list of IndexModel instances')
         if indexes:
-            db_indexes = cls.querybuilder.check_indexes()
+            db_indexes = cls.q.check_indexes()
             indexes_to_create = [
                 i for i in indexes if i.document['name'] not in db_indexes
             ]
@@ -283,11 +283,11 @@ class MongoModel(BaseModel):
             ]
             result = []
             if indexes_to_create:
-                result = cls.__querybuilder__.create_indexes(indexes_to_create)
+                result = cls.q.create_indexes(indexes_to_create)
             if indexes_to_delete:
                 for index_name in indexes_to_delete:
-                    cls.__querybuilder__.drop_index(index_name)
-                db_indexes = cls.__querybuilder__.check_indexes()
+                    cls.q.drop_index(index_name)
+                db_indexes = cls.q.check_indexes()
             indexes = set(list(db_indexes.keys()) + result)
         setattr(cls, '__indexes__', indexes)
 
@@ -305,7 +305,7 @@ class MongoModel(BaseModel):
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
-            self.querybuilder.update_one(
+            self.q.update_one(
                 session=session, **data,
             )
             return self
@@ -314,12 +314,12 @@ class MongoModel(BaseModel):
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = self.querybuilder.insert_one(session=session, **data,)
+        object_id = self.q.insert_one(session=session, **data,)
         self._id = object_id.__str__()
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
-        self.querybuilder.delete_one(_id=ObjectId(self._id), session=session)
+        self.q.delete_one(_id=ObjectId(self._id), session=session)
 
     def drop(self, session: Optional[ClientSession] = None) -> None:
         return self.delete(session)
@@ -331,6 +331,8 @@ class MongoModel(BaseModel):
     def serialize_json(self, fields: Union[Tuple, List]) -> str:
         return dumps(self.serialize(fields))
 
+
+class MongoModel(BaseModel):
     def __hash__(self):
         if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
