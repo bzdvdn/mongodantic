@@ -1,4 +1,4 @@
-from typing import Union, List, Dict, Optional, Any, Tuple, TYPE_CHECKING
+from typing import Union, List, Dict, Optional, Any, Tuple, TYPE_CHECKING, Generator
 from collections.abc import Iterable
 from abc import ABC
 from pymongo import ReturnDocument
@@ -123,6 +123,30 @@ class BaseQueryBuilder(ABC):
             return obj
         return None
 
+    def _find(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
+        sort: Optional[int] = None,
+        **query,
+    ) -> Generator:
+        data = self.__query(
+            'find', logical_query or query, session=session, logical=bool(logical_query)
+        )
+        if skip_rows is not None:
+            data = data.skip(skip_rows)
+        if limit_rows:
+            data = data.limit(limit_rows)
+        sort, sort_fields = sort_validation(sort, sort_fields)
+        return (
+            data.sort([(field, sort or 1) for field in sort_fields])
+            if sort_fields
+            else data
+        )
+
     def find(
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
@@ -133,20 +157,10 @@ class BaseQueryBuilder(ABC):
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
-        data = self.__query(
-            'find', logical_query or query, session=session, logical=bool(logical_query)
+        data = self._find(
+            logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
         )
-        if skip_rows is not None:
-            data = data.skip(skip_rows)
-        if limit_rows:
-            data = data.limit(limit_rows)
-        sort, sort_fields = sort_validation(sort, sort_fields)
-        return QuerySet(
-            self._mongo_model,
-            data.sort([(field, sort or 1) for field in sort_fields])
-            if sort_fields
-            else data,
-        )
+        return QuerySet(self._mongo_model, data)
 
     def find_with_count(
         self,
@@ -597,7 +611,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
     def __getattribute__(self, name: str) -> Any:
         declared_methods = (
             'find_one',
-            'find',
+            '_find',
             'delete_one',
             'delete_many',
             'insert_one',
@@ -605,23 +619,10 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             'update_one',
             'update_many',
             'count',
-            'find_and_replace',
-            'bulk_update_or_create',
-            'bulk_create',
-            'bulk_update',
-            'get',
-            'get_or_create',
-            'update_or_create',
             'distinct',
             'raw_aggregate',
-            'simple_aggregate',
-            'aggregate_sum',
-            'aggregate_avg',
-            'aggregate_max',
-            'aggregate_min',
             'raw_query',
             'replace_one',
-            'find_with_count',
             '__query',
             '_find_with_replacement_or_with_update',
             '_aggregate',
@@ -630,3 +631,174 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         if name in declared_methods:
             return sync_to_async(super().__getattribute__(name))
         return super().__getattribute__(name)
+
+    async def find(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
+        sort: Optional[int] = None,
+        **query,
+    ) -> QuerySet:
+        data = await self._find(
+            logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
+        )
+        return QuerySet(self._mongo_model, data)
+
+    async def get_or_create(self, **query) -> Tuple:
+        defaults = query.pop('defaults', {})
+        obj = await self.find_one(**query)
+        if obj:
+            created = False
+        else:
+            created = True
+            inserted_id = await self.insert_one(**{**query, **defaults})
+            obj = await self.find_one(_id=inserted_id)
+        return obj, created
+
+    async def simple_aggregate(self, *args, **kwargs):
+        return await self._aggregate(*args, **kwargs)
+
+    async def aggregate_sum(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Sum(agg_field), **query)
+        return result.get(f'{agg_field}__sum', 0)
+
+    async def aggregate_max(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Max(agg_field), **query)
+        return result.get(f'{agg_field}__max', 0)
+
+    async def aggregate_min(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Min(agg_field), **query)
+        return result.get(f'{agg_field}__min', 0)
+
+    async def aggregate_avg(self, agg_field: str, **query) -> dict:
+        result = self._aggregate(aggregation=Avg(agg_field), **query)
+        return result.get(f'{agg_field}__avg', 0)
+
+    async def bulk_create(
+        self,
+        models: List,
+        batch_size: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+    ) -> int:
+        if batch_size is None or batch_size <= 0:
+            batch_size = 30000
+        result = 0
+        for data in chunk_by_length(models, batch_size):
+            result += await self.insert_many(data, session=session)
+        return result
+
+    async def bulk_update(
+        self,
+        models: List,
+        updated_fields: List,
+        batch_size: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+    ) -> None:
+        if not updated_fields:
+            raise ValidationError('updated_fields cannot be empty')
+        return await self._bulk_operation(
+            models,
+            updated_fields=updated_fields,
+            batch_size=batch_size,
+            session=session,
+        )
+
+    async def bulk_update_or_create(
+        self,
+        models: List,
+        query_fields: List,
+        batch_size: Optional[int] = 10000,
+        session: Optional[ClientSession] = None,
+    ) -> None:
+        if not query_fields:
+            raise ValidationError('query_fields cannot be empty')
+        return await self._bulk_operation(
+            models,
+            query_fields=query_fields,
+            batch_size=batch_size,
+            upsert=True,
+            session=session,
+        )
+
+    async def get(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
+        sort: Optional[int] = None,
+        **query,
+    ) -> Any:
+        obj = await self.find_one(
+            logical_query=logical_query,
+            session=session,
+            sort_fields=sort_fields,
+            sort=sort,
+            **query,
+        )
+        if not obj:
+            raise DoesNotExist(self._mongo_model.__name__)  # type: ignore
+        return obj
+
+    async def find_and_replace(
+        self,
+        replacement: Union[dict, Any],
+        projection_fields: Optional[list] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
+        sort: Optional[int] = None,
+        upsert: bool = False,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> Any:
+        if not isinstance(replacement, dict):
+            replacement = replacement.query_data
+        return await self._find_with_replacement_or_with_update(
+            'find_and_replace',
+            projection_fields=projection_fields,
+            sort_fields=[(field, sort) for field in sort_fields]
+            if sort_fields
+            else None,
+            sort=sort,
+            upsert=upsert,
+            session=session,
+            replacement=replacement,
+            **query,
+        )
+
+    async def update_or_create(self, **query) -> Tuple:
+        defaults = query.pop('defaults', {})
+        obj = await self.find_one(**query)
+        if obj:
+            created = False
+            for field, value in defaults.items():
+                setattr(obj, field, value)
+            obj.save()
+        else:
+            created = True
+            inserted_id = await self.insert_one(**{**query, **defaults})
+            obj = await self.find_one(_id=inserted_id)
+        return obj, created
+
+    async def find_with_count(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        skip_rows: Optional[int] = None,
+        limit_rows: Optional[int] = None,
+        session: Optional[ClientSession] = None,
+        sort_fields: Optional[Union[Tuple, List]] = None,
+        sort: Optional[int] = None,
+        **query,
+    ) -> tuple:
+        count = await self.count(session=session, logical_query=logical_query, **query,)
+        results = await self.find(
+            skip_rows=skip_rows,
+            limit_rows=limit_rows,
+            session=session,
+            logical_query=logical_query,
+            sort_fields=sort_fields,
+            sort=sort,
+            **query,
+        )
+        return count, results

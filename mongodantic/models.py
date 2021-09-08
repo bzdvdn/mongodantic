@@ -349,7 +349,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
-            self.AQ.update_one(
+            await self.AQ.update_one(
                 session=session, **data,
             )
             return self
