@@ -274,6 +274,18 @@ class TestBasicOperation(unittest.TestCase):
         with pytest.raises(DoesNotExist):
             _ = self.Ticket.Q.get(name='invalid_name')
 
+    @pytest.mark.asyncio
+    async def test_async_get(self):
+        await self.test_async_insert_one()
+        data = await self.Ticket.AQ.get(name='first')
+        second = await self.Ticket.AQ.get(_id=data._id)
+        assert isinstance(data, MongoModel)
+        assert data.name == 'first'
+        assert data.position == 1
+        assert second._id == data._id
+        with pytest.raises(DoesNotExist):
+            _ = self.Ticket.Q.get(name='invalid_name')
+
     def test_distinct(self):
         self.test_insert_many()
         data = self.Ticket.Q.distinct('config.param1', name='second')
@@ -292,6 +304,12 @@ class TestBasicOperation(unittest.TestCase):
         deleted = self.Ticket.Q.delete_one(position=1)
         assert deleted == 1
 
+    @pytest.mark.asyncio
+    async def test_async_delete_one(self):
+        await self.test_async_insert_one()
+        deleted = await self.Ticket.AQ.delete_one(position=1)
+        assert deleted == 1
+
     def test_delete_many(self):
         self.test_insert_many()
         deleted = self.Ticket.Q.delete_many(position=2)
@@ -301,6 +319,17 @@ class TestBasicOperation(unittest.TestCase):
         deleted = self.Ticket.Q.delete_many(_id__in=[i._id for i in items])
         assert deleted == 2
 
+    @pytest.mark.asyncio
+    async def test_delete_many(self):
+        self.test_insert_many()
+        deleted = await self.Ticket.AQ.delete_many(position=2)
+        assert deleted == 2
+        self.test_insert_many()
+        r = await self.Ticket.AQ.find()
+        items = r.list
+        deleted = await self.Ticket.AQ.delete_many(_id__in=[i._id for i in items])
+        assert deleted == 2
+
     def test_update_one(self):
         self.test_insert_one()
         data = self.Ticket.Q.update_one(name='first', config__set={'updated': 1})
@@ -308,10 +337,28 @@ class TestBasicOperation(unittest.TestCase):
         assert data == 1
         assert updated.config == {'updated': 1}
 
+    @pytest.mark.asyncio
+    async def test_async_update_one(self):
+        self.test_insert_one()
+        data = await self.Ticket.AQ.update_one(name='first', config__set={'updated': 1})
+        updated = await self.Ticket.AQ.find_one(name='first')
+        assert data == 1
+        assert updated.config == {'updated': 1}
+
     def test_update_many(self):
         self.test_insert_many()
         data = self.Ticket.Q.update_many(name='second', config__set={'updated': 3})
         updated = self.Ticket.Q.find_one(name='second')
+        assert data == 2
+        assert updated.config == {'updated': 3}
+
+    @pytest.mark.asyncio
+    async def test_async_update_many(self):
+        self.test_insert_many()
+        data = await self.Ticket.AQ.update_many(
+            name='second', config__set={'updated': 3}
+        )
+        updated = await self.Ticket.AQ.find_one(name='second')
         assert data == 2
         assert updated.config == {'updated': 3}
 
@@ -326,11 +373,33 @@ class TestBasicOperation(unittest.TestCase):
         assert isinstance(data_with_prejection, dict)
         assert data_with_prejection['position'] == 12
 
+    @pytest.mark.asyncio
+    async def test_async_find_and_update(self):
+        self.test_insert_one()
+        data_default = await self.Ticket.AQ.find_one_and_update(
+            name='first', position__set=23
+        )
+        assert data_default.position == 23
+
+        data_with_prejection = await self.Ticket.AQ.find_one_and_update(
+            name='first', position__set=12, projection_fields=['position']
+        )
+        assert isinstance(data_with_prejection, dict)
+        assert data_with_prejection['position'] == 12
+
     def test_delete_method(self):
         self.test_insert_one()
         ticket = self.Ticket.Q.find_one(name='first')
         ticket.delete()
         data = self.Ticket.Q.find_one(name='first')
+        assert data is None
+
+    @pytest.mark.asyncio
+    async def test_async_delete_method(self):
+        self.test_insert_one()
+        ticket = await self.Ticket.AQ.find_one(name='first')
+        await ticket.delete_async()
+        data = await self.Ticket.AQ.find_one(name='first')
         assert data is None
 
     def test_session(self):

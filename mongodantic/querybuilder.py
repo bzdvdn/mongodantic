@@ -674,7 +674,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         return result.get(f'{agg_field}__min', 0)
 
     async def aggregate_avg(self, agg_field: str, **query) -> dict:
-        result = self._aggregate(aggregation=Avg(agg_field), **query)
+        result = await self._aggregate(aggregation=Avg(agg_field), **query)
         return result.get(f'{agg_field}__avg', 0)
 
     async def bulk_create(
