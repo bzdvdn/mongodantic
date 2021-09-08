@@ -22,6 +22,7 @@ from .queryset import QuerySet
 from .logical import LogicalCombination, Query
 from .aggregation import Sum, Max, Min, Avg
 from .exceptions import DoesNotExist
+from .sync_async import sync_to_async
 
 if TYPE_CHECKING:
     from .models import MongoModel
@@ -263,7 +264,7 @@ class BaseQueryBuilder(ABC):
             **query,
         )
         if not obj:
-            raise DoesNotExist(self._mongo_model.__name__) #type: ignore
+            raise DoesNotExist(self._mongo_model.__name__)  # type: ignore
         return obj
 
     def __validate_raw_query(
@@ -593,4 +594,39 @@ class QueryBuilder(BaseQueryBuilder):
 
 
 class AsyncQueryBuilder(BaseQueryBuilder):
-    pass
+    def __getattribute__(self, name: str) -> Any:
+        declared_methods = (
+            'find_one',
+            'find',
+            'delete_one',
+            'delete_many',
+            'insert_one',
+            'insert_many',
+            'update_one',
+            'update_many',
+            'count',
+            'find_and_replace',
+            'bulk_update_or_create',
+            'bulk_create',
+            'bulk_update',
+            'get',
+            'get_or_create',
+            'update_or_create',
+            'distinct',
+            'raw_aggregate',
+            'simple_aggregate',
+            'aggregate_sum',
+            'aggregate_avg',
+            'aggregate_max',
+            'aggregate_min',
+            'raw_query',
+            'replace_one',
+            'find_with_count',
+            '__query',
+            '_find_with_replacement_or_with_update',
+            '_aggregate',
+            '_bulk_operation',
+        )
+        if name in declared_methods:
+            return sync_to_async(super().__getattribute__(name))
+        return super().__getattribute__(name)

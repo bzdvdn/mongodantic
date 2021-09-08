@@ -1,6 +1,7 @@
 import os
 from json import dumps
 from abc import ABC
+from logging import getLogger
 from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING
 from pymongo.client_session import ClientSession
 from bson import ObjectId
@@ -30,6 +31,8 @@ if TYPE_CHECKING:
     from pydantic.typing import AbstractSetIntStr  # noqa: F401
 
 __all__ = ('MongoModel', 'QuerySet', 'Query')
+
+logger = getLogger('mongodantic')
 
 _is_mongo_model_class_defined = False
 
@@ -251,20 +254,22 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return cls.get_collection()
 
     @classproperty
-    def q(cls) -> Optional[QueryBuilder]:
+    def Q(cls) -> Optional[QueryBuilder]:
         return cls.__querybuilder__
 
     @classproperty
-    def aq(cls) -> Optional[AsyncQueryBuilder]:
+    def AQ(cls) -> Optional[AsyncQueryBuilder]:
         return cls.__aquerybuilder__
 
     @classproperty
     def querybuilder(cls) -> Optional[QueryBuilder]:
-        return cls.q
+        logger.warning('querybuilder property is deprecated.')
+        return cls.Q
 
     @classproperty
     def async_querybuilder(cls) -> Optional[AsyncQueryBuilder]:
-        return cls.aq
+        logger.warning('async_querybuilder property is deprecated.')
+        return cls.AQ
 
     @classmethod
     def execute_indexes(cls):
@@ -272,7 +277,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         if not all([isinstance(index, IndexModel) for index in indexes]):
             raise ValueError('indexes must be list of IndexModel instances')
         if indexes:
-            db_indexes = cls.q.check_indexes()
+            db_indexes = cls.Q.check_indexes()
             indexes_to_create = [
                 i for i in indexes if i.document['name'] not in db_indexes
             ]
@@ -283,11 +288,11 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             ]
             result = []
             if indexes_to_create:
-                result = cls.q.create_indexes(indexes_to_create)
+                result = cls.Q.create_indexes(indexes_to_create)
             if indexes_to_delete:
                 for index_name in indexes_to_delete:
-                    cls.q.drop_index(index_name)
-                db_indexes = cls.q.check_indexes()
+                    cls.Q.drop_index(index_name)
+                db_indexes = cls.Q.check_indexes()
             indexes = set(list(db_indexes.keys()) + result)
         setattr(cls, '__indexes__', indexes)
 
@@ -305,7 +310,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
-            self.q.update_one(
+            self.Q.update_one(
                 session=session, **data,
             )
             return self
@@ -314,22 +319,48 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = self.q.insert_one(session=session, **data,)
+        object_id = self.Q.insert_one(session=session, **data,)
         self._id = object_id.__str__()
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
-        self.q.delete_one(_id=ObjectId(self._id), session=session)
+        self.Q.delete_one(_id=ObjectId(self._id), session=session)
 
     def drop(self, session: Optional[ClientSession] = None) -> None:
         return self.delete(session)
 
-    def serialize(self, fields: Union[Tuple, List]) -> dict:
-        data = self.dict(include=set(fields))
-        return {f: data[f] for f in fields}
+    async def delete_async(self, session: Optional[ClientSession] = None) -> None:
+        await self.AQ.delete_one(_id=ObjectId(self._id), session=session)
 
-    def serialize_json(self, fields: Union[Tuple, List]) -> str:
-        return dumps(self.serialize(fields))
+    async def drop_async(self, session: Optional[ClientSession] = None) -> None:
+        return await self.delete_async(session)
+
+    async def save_async(
+        self,
+        updated_fields: Union[Tuple, List] = [],
+        session: Optional[ClientSession] = None,
+    ) -> Any:
+        if self._id is not None:
+            data = {'_id': ObjectId(self._id)}
+            if updated_fields:
+                if not all(field in self.__fields__ for field in updated_fields):
+                    raise ValidationError('invalid field in updated_fields')
+            else:
+                updated_fields = tuple(self.__fields__.keys())
+            for field in updated_fields:
+                data[f'{field}__set'] = getattr(self, field)
+            self.AQ.update_one(
+                session=session, **data,
+            )
+            return self
+        data = {
+            field: value
+            for field, value in self.__dict__.items()
+            if field in self.__fields__
+        }
+        object_id = await self.AQ.insert_one(session=session, **data,)
+        self._id = object_id.__str__()
+        return self
 
 
 class MongoModel(BaseModel):
@@ -337,6 +368,13 @@ class MongoModel(BaseModel):
         if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
+
+    def serialize(self, fields: Union[Tuple, List]) -> dict:
+        data: dict = self.dict(include=set(fields))
+        return {f: data[f] for f in fields}
+
+    def serialize_json(self, fields: Union[Tuple, List]) -> str:
+        return dumps(self.serialize(fields))
 
     @property
     def pk(self):

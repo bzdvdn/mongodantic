@@ -1,5 +1,5 @@
 from json import dumps
-from typing import Generator, List, Optional, Union, Any, Tuple, List, TYPE_CHECKING
+from typing import Generator, List, Union, Any, Tuple, List, TYPE_CHECKING
 
 from .helpers import handle_and_convert_connection_errors
 

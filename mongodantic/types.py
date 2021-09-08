@@ -16,7 +16,7 @@ class ObjectIdStr(str):
         yield cls.validate
 
     @classmethod
-    def validate(cls, v: str,) -> ObjectId:
+    def validate(cls, v: str) -> ObjectId:
         if isinstance(v, ObjectId):
             return v
         else:
