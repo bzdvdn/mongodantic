@@ -1,9 +1,7 @@
 import unittest
-from bson import ObjectId
 
 from mongodantic.models import MongoModel
 from mongodantic import init_db_connection_params
-from mongodantic.session import Session
 
 
 class TestQueriesWithInners(unittest.TestCase):

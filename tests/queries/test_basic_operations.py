@@ -234,7 +234,7 @@ class TestBasicOperation(unittest.TestCase):
 
     @pytest.mark.asyncio
     async def test_async_find_one(self):
-        self.test_insert_one()
+        await self.test_async_insert_one()
         data = await self.Ticket.AQ.find_one(name='first')
         second = await self.Ticket.AQ.find_one(_id=data._id)
         assert isinstance(data, MongoModel)

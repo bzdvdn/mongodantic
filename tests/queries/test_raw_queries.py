@@ -20,46 +20,81 @@ class TestBasicOperation(unittest.TestCase):
             class Config:
                 excluded_query_fields = ('sign', 'type')
 
-        User.querybuilder.drop_collection(force=True)
+        User.Q.drop_collection(force=True)
         self.User = User
 
     def test_raw_insert_one(self):
         with pytest.raises(ValidationError):
-            result = self.User.querybuilder.raw_query(
+            result = self.User.Q.raw_query(
                 'insert_one', {'id': uuid4(), 'name': {}, 'email': []}
             )
-        result = self.User.querybuilder.raw_query(
+        result = self.User.Q.raw_query(
             'insert_one', {'id': uuid4(), 'name': 'first', 'email': 'first@mail.ru'}
         )
         assert isinstance(result.inserted_id, ObjectId)
 
-    def test_raw_insert_many(self):
+    @pytest.mark.asyncio
+    async def test_async_raw_insert_one(self):
         with pytest.raises(ValidationError):
-            result = self.User.querybuilder.raw_query(
+            result = await self.User.AQ.raw_query(
+                'insert_one', {'id': uuid4(), 'name': {}, 'email': []}
+            )
+        result = await self.User.AQ.raw_query(
+            'insert_one', {'id': uuid4(), 'name': 'first', 'email': 'first@mail.ru'}
+        )
+        assert isinstance(result.inserted_id, ObjectId)
+
+    @pytest.mark.asyncio
+    async def test_async_raw_insert_many(self):
+        with pytest.raises(ValidationError):
+            result = await self.User.AQ.raw_query(
                 'insert_many', [{'id': uuid4(), 'name': {}, 'email': []}]
             )
-        result = self.User.querybuilder.raw_query(
+        result = await self.User.AQ.raw_query(
             'insert_many', [{'id': uuid4(), 'name': 'first', 'email': 'first@mail.ru'}]
         )
         assert len(result.inserted_ids) == 1
 
     def test_raw_find_one(self):
         self.test_raw_insert_one()
-        result = self.User.querybuilder.raw_query('find_one', {'name': 'first'})
+        result = self.User.Q.raw_query('find_one', {'name': 'first'})
+        assert result['name'] == 'first'
+        assert result['email'] == 'first@mail.ru'
+
+    @pytest.mark.asyncio
+    async def test_async_raw_find_one(self):
+        await self.test_async_raw_insert_one()
+        result = await self.User.AQ.raw_query('find_one', {'name': 'first'})
         assert result['name'] == 'first'
         assert result['email'] == 'first@mail.ru'
 
     def test_raw_update_one(self):
         self.test_raw_insert_one()
         with pytest.raises(ValidationError):
-            result = self.User.querybuilder.raw_query(
+            result = self.User.Q.raw_query(
                 'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
             )
-        result = self.User.querybuilder.raw_query(
+        result = self.User.Q.raw_query(
             'update_one', raw_query=({'name': 'first'}, {'$set': {'name': 'updated'}})
         )
 
         assert result.modified_count == 1
 
-        modifed_result = self.User.querybuilder.find_one(email='first@mail.ru')
+        modifed_result = self.User.Q.find_one(email='first@mail.ru')
+        assert modifed_result.name == 'updated'
+
+    @pytest.mark.asyncio
+    async def test_async_raw_update_one(self):
+        await self.test_async_raw_insert_one()
+        with pytest.raises(ValidationError):
+            result = await self.User.AQ.raw_query(
+                'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
+            )
+        result = await self.User.AQ.raw_query(
+            'update_one', raw_query=({'name': 'first'}, {'$set': {'name': 'updated'}})
+        )
+
+        assert result.modified_count == 1
+
+        modifed_result = await self.User.AQ.find_one(email='first@mail.ru')
         assert modifed_result.name == 'updated'
