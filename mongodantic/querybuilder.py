@@ -8,6 +8,7 @@ from typing import (
     TYPE_CHECKING,
     Generator,
     Coroutine,
+    no_type_check,
 )
 from collections.abc import Iterable
 from abc import ABC
@@ -640,7 +641,8 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             return sync_to_async(super().__getattribute__(name))
         return super().__getattribute__(name)
 
-    async def find(  # type: ignore
+    @no_type_check
+    async def find(
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
@@ -650,42 +652,49 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
-        data = await self._find(  # type: ignore
+        data = await self._find(
             logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
         )
         return QuerySet(self._mongo_model, data)
 
-    async def get_or_create(self, **query) -> Tuple:  # type: ignore
+    @no_type_check
+    async def get_or_create(self, **query) -> Tuple:
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
         if obj:
             created = False
         else:
             created = True
-            inserted_id = await self.insert_one(**{**query, **defaults})  # type: ignore
-            obj = await self.find_one(_id=inserted_id)  # type: ignore
+            inserted_id = await self.insert_one(**{**query, **defaults})
+            obj = await self.find_one(_id=inserted_id)
         return obj, created
 
+    @no_type_check
     async def simple_aggregate(self, *args, **kwargs):
         return await self._aggregate(*args, **kwargs)
 
-    async def aggregate_sum(self, agg_field: str, **query) -> dict:  # type: ignore
-        result = await self._aggregate(aggregation=Sum(agg_field), **query)  # type: ignore
+    @no_type_check
+    async def aggregate_sum(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Sum(agg_field), **query)
         return result.get(f'{agg_field}__sum', 0)
 
-    async def aggregate_max(self, agg_field: str, **query) -> dict:  # type: ignore
-        result = await self._aggregate(aggregation=Max(agg_field), **query)  # type: ignore
+    @no_type_check
+    async def aggregate_max(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Max(agg_field), **query)
         return result.get(f'{agg_field}__max', 0)
 
-    async def aggregate_min(self, agg_field: str, **query) -> dict:  # type: ignore
-        result = await self._aggregate(aggregation=Min(agg_field), **query)  # type: ignore
+    @no_type_check
+    async def aggregate_min(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Min(agg_field), **query)
         return result.get(f'{agg_field}__min', 0)
 
-    async def aggregate_avg(self, agg_field: str, **query) -> dict:  # type: ignore
-        result = await self._aggregate(aggregation=Avg(agg_field), **query)  # type: ignore
+    @no_type_check
+    async def aggregate_avg(self, agg_field: str, **query) -> dict:
+        result = await self._aggregate(aggregation=Avg(agg_field), **query)
         return result.get(f'{agg_field}__avg', 0)
 
-    async def bulk_create(  # type: ignore
+    @no_type_check
+    async def bulk_create(
         self,
         models: List,
         batch_size: Optional[int] = None,
@@ -698,7 +707,8 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             result += await self.insert_many(data, session=session)  # type: ignore
         return result
 
-    async def bulk_update(  # type: ignore
+    @no_type_check
+    async def bulk_update(
         self,
         models: List,
         updated_fields: List,
@@ -707,14 +717,15 @@ class AsyncQueryBuilder(BaseQueryBuilder):
     ) -> None:
         if not updated_fields:
             raise ValidationError('updated_fields cannot be empty')
-        await self._bulk_operation(  # type: ignore
+        await self._bulk_operation(
             models,
             updated_fields=updated_fields,
             batch_size=batch_size,
             session=session,
         )
 
-    async def bulk_update_or_create(  # type: ignore
+    @no_type_check
+    async def bulk_update_or_create(
         self,
         models: List,
         query_fields: List,
@@ -723,7 +734,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
     ) -> Coroutine[Any, Any, None]:
         if not query_fields:
             raise ValidationError('query_fields cannot be empty')
-        await self._bulk_operation(  # type: ignore
+        await self._bulk_operation(
             models,
             query_fields=query_fields,
             batch_size=batch_size,
@@ -731,6 +742,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             session=session,
         )
 
+    @no_type_check
     async def get(
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
@@ -747,9 +759,10 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             **query,
         )
         if not obj:
-            raise DoesNotExist(self._mongo_model.__name__)  # type: ignore
+            raise DoesNotExist(self._mongo_model.__name__)
         return obj
 
+    @no_type_check
     async def find_and_replace(
         self,
         replacement: Union[dict, Any],
@@ -759,7 +772,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         upsert: bool = False,
         session: Optional[ClientSession] = None,
         **query,
-    ) -> Any:  # type: ignore
+    ) -> Any:
         if not isinstance(replacement, dict):
             replacement = replacement.query_data
         return await self._find_with_replacement_or_with_update(
@@ -775,7 +788,8 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             **query,
         )
 
-    async def update_or_create(self, **query) -> Tuple:  # type: ignore
+    @no_type_check
+    async def update_or_create(self, **query) -> Tuple:
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
         if obj:
@@ -789,7 +803,8 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             obj = await self.find_one(_id=inserted_id)
         return obj, created
 
-    async def find_with_count(  # type: ignore
+    @no_type_check
+    async def find_with_count(
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
@@ -799,7 +814,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> tuple:
-        count = await self.count(session=session, logical_query=logical_query, **query,)  # type: ignore
+        count = await self.count(session=session, logical_query=logical_query, **query,)
         results = await self.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,
