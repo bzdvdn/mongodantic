@@ -4,6 +4,8 @@ import functools
 import threading
 from typing import Coroutine, Callable
 
+__all__ = ('sync_to_async', 'async_to_sync')
+
 
 class AsyncToSync:
     """

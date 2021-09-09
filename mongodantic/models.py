@@ -43,13 +43,13 @@ class ModelMetaclass(PydanticModelMetaclass):
         indexes = set()
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
             querybuilder = getattr(cls, '__querybuilder__')
-            async_querybuilder = getattr(cls, '__aquerybuilder__')
+            async_querybuilder = getattr(cls, '__async_querybuilder__')
             if querybuilder is None:
                 querybuilder = QueryBuilder(cls)
                 setattr(cls, '__querybuilder__', querybuilder)
             if async_querybuilder is None:
                 async_querybuilder = AsyncQueryBuilder(cls)
-                setattr(cls, '__aquerybuilder__', async_querybuilder)
+                setattr(cls, '__async_querybuilder__', async_querybuilder)
             # setattr(cls, 'querybuilder', querybuilder)
 
         exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
@@ -63,7 +63,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
     __exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
     __querybuilder__: Optional[QueryBuilder] = None
-    __aquerybuilder__: Optional[AsyncQueryBuilder] = None
+    __async_querybuilder__: Optional[AsyncQueryBuilder] = None
     _id: Optional[ObjectIdStr] = None
 
     def __setattr__(self, key, value):
@@ -259,7 +259,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
 
     @classproperty
     def AQ(cls) -> Optional[AsyncQueryBuilder]:
-        return cls.__aquerybuilder__
+        return cls.__async_querybuilder__
 
     @classproperty
     def querybuilder(cls) -> Optional[QueryBuilder]:

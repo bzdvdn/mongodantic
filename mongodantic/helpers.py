@@ -13,7 +13,6 @@ from typing import (
     TYPE_CHECKING,
     Type,
 )
-from pydantic import BaseModel as BasePydanticModel
 from bson import ObjectId
 from pymongo import UpdateOne
 from pymongo.errors import (

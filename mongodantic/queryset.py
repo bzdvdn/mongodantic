@@ -6,6 +6,8 @@ from .helpers import handle_and_convert_connection_errors
 if TYPE_CHECKING:
     from .models import MongoModel
 
+__all__ = ('QuerySet',)
+
 
 class QuerySet(object):
     def __init__(
@@ -18,6 +20,9 @@ class QuerySet(object):
     def __iter__(self):
         for obj in self._data:
             yield self._model.parse_obj(obj)
+
+    # def __aiter__(self):
+    #     return self.__iter__()
 
     def __next__(self):
         return next(self.__iter__())

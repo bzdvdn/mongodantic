@@ -1,4 +1,14 @@
-from typing import Union, List, Dict, Optional, Any, Tuple, TYPE_CHECKING, Generator
+from typing import (
+    Union,
+    List,
+    Dict,
+    Optional,
+    Any,
+    Tuple,
+    TYPE_CHECKING,
+    Generator,
+    Coroutine,
+)
 from collections.abc import Iterable
 from abc import ABC
 from pymongo import ReturnDocument
@@ -27,14 +37,12 @@ from .sync_async import sync_to_async
 if TYPE_CHECKING:
     from .models import MongoModel
 
+__all__ = ('QueryBuilder', 'AsyncQueryBuilder')
+
 
 class BaseQueryBuilder(ABC):
     def __init__(self, mongo_model: 'MongoModel'):
         self._mongo_model = mongo_model
-
-    def add_model(self, mongo_model):
-        if not self._mongo_model:
-            self._mongo_model = mongo_model
 
     @handle_and_convert_connection_errors
     def __query(
@@ -52,11 +60,11 @@ class BaseQueryBuilder(ABC):
             query_params = self._mongo_model._validate_query_data(query_params)
 
         method = getattr(self._mongo_model._collection, method_name)
-        query = [query_params]
+        query: tuple = (query_params,)
         if session:
             kwargs['session'] = session
         if set_values:
-            query = [query_params, set_values]
+            query = (query_params, set_values)
         if kwargs:
             return method(*query, **kwargs)
         return method(*query)
@@ -65,9 +73,9 @@ class BaseQueryBuilder(ABC):
         index_list = list(self.__query('list_indexes', {}))
         return_data = {}
         for index in index_list:
-            d = dict(index)
-            _dict = {d['name']: {'key': dict(d['key'])}}
-            return_data.update(_dict)
+            dict_index = dict(index)
+            data = {dict_index['name']: {'key': dict(dict_index['key'])}}
+            return_data.update(data)
         return return_data
 
     def create_indexes(
@@ -632,7 +640,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             return sync_to_async(super().__getattribute__(name))
         return super().__getattribute__(name)
 
-    async def find(
+    async def find(  # type: ignore
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
@@ -642,55 +650,55 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
-        data = await self._find(
+        data = await self._find(  # type: ignore
             logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
         )
         return QuerySet(self._mongo_model, data)
 
-    async def get_or_create(self, **query) -> Tuple:
+    async def get_or_create(self, **query) -> Tuple:  # type: ignore
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
         if obj:
             created = False
         else:
             created = True
-            inserted_id = await self.insert_one(**{**query, **defaults})
-            obj = await self.find_one(_id=inserted_id)
+            inserted_id = await self.insert_one(**{**query, **defaults})  # type: ignore
+            obj = await self.find_one(_id=inserted_id)  # type: ignore
         return obj, created
 
     async def simple_aggregate(self, *args, **kwargs):
         return await self._aggregate(*args, **kwargs)
 
-    async def aggregate_sum(self, agg_field: str, **query) -> dict:
-        result = await self._aggregate(aggregation=Sum(agg_field), **query)
+    async def aggregate_sum(self, agg_field: str, **query) -> dict:  # type: ignore
+        result = await self._aggregate(aggregation=Sum(agg_field), **query)  # type: ignore
         return result.get(f'{agg_field}__sum', 0)
 
-    async def aggregate_max(self, agg_field: str, **query) -> dict:
-        result = await self._aggregate(aggregation=Max(agg_field), **query)
+    async def aggregate_max(self, agg_field: str, **query) -> dict:  # type: ignore
+        result = await self._aggregate(aggregation=Max(agg_field), **query)  # type: ignore
         return result.get(f'{agg_field}__max', 0)
 
-    async def aggregate_min(self, agg_field: str, **query) -> dict:
-        result = await self._aggregate(aggregation=Min(agg_field), **query)
+    async def aggregate_min(self, agg_field: str, **query) -> dict:  # type: ignore
+        result = await self._aggregate(aggregation=Min(agg_field), **query)  # type: ignore
         return result.get(f'{agg_field}__min', 0)
 
-    async def aggregate_avg(self, agg_field: str, **query) -> dict:
-        result = await self._aggregate(aggregation=Avg(agg_field), **query)
+    async def aggregate_avg(self, agg_field: str, **query) -> dict:  # type: ignore
+        result = await self._aggregate(aggregation=Avg(agg_field), **query)  # type: ignore
         return result.get(f'{agg_field}__avg', 0)
 
-    async def bulk_create(
+    async def bulk_create(  # type: ignore
         self,
         models: List,
         batch_size: Optional[int] = None,
         session: Optional[ClientSession] = None,
-    ) -> int:
+    ) -> int:  # type: ignore
         if batch_size is None or batch_size <= 0:
             batch_size = 30000
         result = 0
         for data in chunk_by_length(models, batch_size):
-            result += await self.insert_many(data, session=session)
+            result += await self.insert_many(data, session=session)  # type: ignore
         return result
 
-    async def bulk_update(
+    async def bulk_update(  # type: ignore
         self,
         models: List,
         updated_fields: List,
@@ -699,23 +707,23 @@ class AsyncQueryBuilder(BaseQueryBuilder):
     ) -> None:
         if not updated_fields:
             raise ValidationError('updated_fields cannot be empty')
-        return await self._bulk_operation(
+        await self._bulk_operation(  # type: ignore
             models,
             updated_fields=updated_fields,
             batch_size=batch_size,
             session=session,
         )
 
-    async def bulk_update_or_create(
+    async def bulk_update_or_create(  # type: ignore
         self,
         models: List,
         query_fields: List,
         batch_size: Optional[int] = 10000,
         session: Optional[ClientSession] = None,
-    ) -> None:
+    ) -> Coroutine[Any, Any, None]:
         if not query_fields:
             raise ValidationError('query_fields cannot be empty')
-        return await self._bulk_operation(
+        await self._bulk_operation(  # type: ignore
             models,
             query_fields=query_fields,
             batch_size=batch_size,
@@ -730,7 +738,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
-    ) -> Any:
+    ) -> Any:  # type: ignore
         obj = await self.find_one(
             logical_query=logical_query,
             session=session,
@@ -751,7 +759,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         upsert: bool = False,
         session: Optional[ClientSession] = None,
         **query,
-    ) -> Any:
+    ) -> Any:  # type: ignore
         if not isinstance(replacement, dict):
             replacement = replacement.query_data
         return await self._find_with_replacement_or_with_update(
@@ -767,21 +775,21 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             **query,
         )
 
-    async def update_or_create(self, **query) -> Tuple:
+    async def update_or_create(self, **query) -> Tuple:  # type: ignore
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
         if obj:
             created = False
             for field, value in defaults.items():
                 setattr(obj, field, value)
-            obj.save()
+            await obj.save_async()
         else:
             created = True
             inserted_id = await self.insert_one(**{**query, **defaults})
             obj = await self.find_one(_id=inserted_id)
         return obj, created
 
-    async def find_with_count(
+    async def find_with_count(  # type: ignore
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         skip_rows: Optional[int] = None,
@@ -791,7 +799,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> tuple:
-        count = await self.count(session=session, logical_query=logical_query, **query,)
+        count = await self.count(session=session, logical_query=logical_query, **query,)  # type: ignore
         results = await self.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,
