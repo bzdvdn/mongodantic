@@ -21,9 +21,6 @@ class QuerySet(object):
         for obj in self._data:
             yield self._model.parse_obj(obj)
 
-    # def __aiter__(self):
-    #     return self.__iter__()
-
     def __next__(self):
         return next(self.__iter__())
 

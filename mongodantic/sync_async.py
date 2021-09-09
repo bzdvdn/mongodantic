@@ -2,7 +2,7 @@ import asyncio
 import concurrent.futures
 import functools
 import threading
-from typing import Coroutine, Callable
+from typing import Coroutine, Callable, no_type_check_decorator
 
 __all__ = ('sync_to_async', 'async_to_sync')
 
@@ -121,5 +121,5 @@ class SyncToAsync:
         return self.func(*args, **kwargs)
 
 
-sync_to_async = SyncToAsync
-async_to_sync = AsyncToSync
+sync_to_async = no_type_check_decorator(SyncToAsync)
+async_to_sync = no_type_check_decorator(AsyncToSync)
