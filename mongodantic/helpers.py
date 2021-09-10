@@ -29,12 +29,16 @@ if TYPE_CHECKING:
     from .models import BaseModel
 
 __all__ = (
+    'handle_and_convert_connection_errors',
     'ExtraQueryMapper',
     'chunk_by_length',
     'bulk_query_generator',
-    'generate_operator_for_multiply_aggregations',
     'cached_classproperty',
+    'group_by_aggregate_generation',
     'classproperty',
+    'sort_validation',
+    'generate_name_field',
+    '_validate_value',
 )
 
 
@@ -66,7 +70,7 @@ def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
     """extra helper value validation
 
     Args:
-        cls (Type[): mongo model instance
+        cls (Type[): mongo model class
         field_name (str): name of field
         value (Any): value
 

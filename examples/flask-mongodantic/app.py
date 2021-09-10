@@ -5,7 +5,7 @@ from pydantic import ValidationError
 from flask import Flask, Response, request
 from mongodantic import connect, models
 
-connect("mongodb://root:password@mongo_database:27017", "test")
+connect("mongodb://root:password@mongo_database_flask:27017", "test")
 
 
 class Book(models.MongoModel):
@@ -34,7 +34,7 @@ def books():
 
 
 @app.route('/', methods=['GET', 'DELETE'])
-def books(book_id):
+def book_detail(book_id):
     if request.method == 'GET':
         book = Book.Q.find_one(_id=book_id)
         if book:
