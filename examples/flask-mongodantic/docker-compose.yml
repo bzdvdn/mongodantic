@@ -8,7 +8,7 @@ services:
       - database
   database:
     image: "mongo"
-    container_name: "mongo_database"
+    container_name: "mongo_database_flask"
     environment:
       - MONGO_INITDB_DATABASE=test
       - MONGO_INITDB_ROOT_USERNAME=root

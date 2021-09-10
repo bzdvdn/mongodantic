@@ -114,6 +114,15 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
+        """count query
+
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query | LogicalCombination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: count of documents
+        """
         if getattr(self._mongo_model._collection, 'count_documents'):
             return self.__query(
                 'count_documents',
@@ -134,6 +143,15 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
+        """count query
+
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query | LogicalCombination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: count of documents
+        """
         return self.count(logical_query, session, **query)
 
     def find_one(
@@ -143,7 +161,18 @@ class BaseQueryBuilder(ABC):
         sort_fields: Optional[Union[Tuple, List]] = None,
         sort: Optional[int] = None,
         **query,
-    ) -> Any:
+    ) -> Optional['MongoModel']:
+        """find one document
+
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query | LogicalCombination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): iterable from sort fielda. Defaults to None.
+            sort (Optional[int], optional): sort value -1 or 1. Defaults to None.
+
+        Returns:
+            Optional[MongoModel]: MongoModel instance or None
+        """
         sort, sort_fields = sort_validation(sort, sort_fields)
         data = self.__query(
             'find_one',
@@ -191,6 +220,19 @@ class BaseQueryBuilder(ABC):
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
+        """find method
+
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query|LogicalCombunation. Defaults to None.
+            skip_rows (Optional[int], optional): skip rows for pagination. Defaults to None.
+            limit_rows (Optional[int], optional): limit rows. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): iterable from sort fielda. Defaults to None.
+            sort (Optional[int], optional): sort value -1 or 1. Defaults to None.
+
+        Returns:
+            QuerySet: Mongodantic QuerySet
+        """
         data = self._find(
             logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
         )
@@ -232,11 +274,28 @@ class BaseQueryBuilder(ABC):
         return count, results
 
     def insert_one(self, session: Optional[ClientSession] = None, **query) -> ObjectId:
+        """insert one document
+
+        Args:
+            session (Optional[ClientSession], optional): Pymongo session. Defaults to None.
+
+        Returns:
+            ObjectId: created document _id
+        """
         obj = self._mongo_model.parse_obj(query)
         data = self.__query('insert_one', obj.query_data, session=session)
         return data.inserted_id
 
     def insert_many(self, data: List, session: Optional[ClientSession] = None) -> int:
+        """insert many documents
+
+        Args:
+            data (List): List of dict or MongoModels
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: count inserted ids
+        """
         parse_obj = self._mongo_model.parse_obj
         query = [
             parse_obj(obj).query_data if isinstance(obj, dict) else obj.query_data
@@ -251,7 +310,15 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
+        """delete one document
 
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query|LogicalCombination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: deleted documents count
+        """
         r = self.__query(
             'delete_one',
             logical_query or query,
@@ -266,7 +333,15 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
+        """delete many document
 
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query|LogicalCombination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: deleted documents count
+        """
         r = self.__query(
             'delete_many',
             logical_query or query,
@@ -332,6 +407,8 @@ class BaseQueryBuilder(ABC):
         sort: Optional[int] = None,
         **query,
     ) -> Any:
+        """method like django orm get"""
+
         obj = self.find_one(
             logical_query=logical_query,
             session=session,
@@ -429,29 +506,73 @@ class BaseQueryBuilder(ABC):
     def update_one(
         self, upsert: bool = False, session: Optional[ClientSession] = None, **query
     ) -> int:
+        """update one document
+
+        Args:
+            upsert (bool, optional): pymongo upsert. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: updated documents count
+        """
         return self._update('update_one', query, upsert=upsert, session=session)
 
     def update_many(
         self, upsert: bool = False, session: Optional[ClientSession] = None, **query
     ) -> int:
+        """update many document
+
+        Args:
+            upsert (bool, optional): pymongo upsert. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: updated documents count
+        """
         return self._update('update_many', query, upsert=upsert, session=session)
 
     def distinct(
         self, field: str, session: Optional[ClientSession] = None, **query
     ) -> Union[list, dict]:
+        """wrapper for pymongo distinct
+
+        Args:
+            field (str): distinct field
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            Union[list, dict]: result
+        """
         query = self._mongo_model._validate_query_data(query)
         method = getattr(self._mongo_model._collection, 'distinct')
         return method(key=field, filter=query, session=session)
 
     def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None) -> list:
+        """raw aggregation query
+
+        Args:
+            data (Any): aggregation query
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            list: aggregation result
+        """
         return list(self.__query("aggregate", data, session=session))
 
     def _aggregate(self, *args, **query) -> dict:
+        """main aggregate method
+
+        Raises:
+            MongoValidationError: miss aggregation or group_by
+
+        Returns:
+            dict: aggregation result
+        """
         session = query.pop('session', None)
         aggregation = query.pop('aggregation', None)
         group_by = query.pop('group_by', None)
         if not aggregation and not group_by:
-            raise ValueError('miss aggregation or group_by')
+            raise MongoValidationError('miss aggregation or group_by')
         if isinstance(aggregation, Iterable):
             aggregate_query = {}
             for agg in aggregation:
@@ -637,7 +758,20 @@ class BaseQueryBuilder(ABC):
         upsert: bool = False,
         session: Optional[ClientSession] = None,
         **query,
-    ) -> Any:
+    ) -> Union[Dict, 'MongoModel']:
+        """base method for find_with_<operation>
+
+        Args:
+            operation (str): operation name
+            projection_fields (Optional[list], optional): prejection. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): sort fields. Defaults to None.
+            sort (Optional[int], optional): -1 or 1. Defaults to None.
+            upsert (bool, optional): True/False. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            Union[Dict, 'MongoModel']: MongoModel or Dict
+        """
         filter_, set_values = self._prepare_update_data(**query)
         return_document = ReturnDocument.AFTER
         replacement = query.pop('replacement', None)
@@ -671,7 +805,19 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ):
+        """find one and update
 
+        Args:
+            operation (str): operation name
+            projection_fields (Optional[list], optional): prejection. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): sort fields. Defaults to None.
+            sort (Optional[int], optional): -1 or 1. Defaults to None.
+            upsert (bool, optional): True/False. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            Union[Dict, 'MongoModel']: MongoModel or Dict
+        """
         return self._find_with_replacement_or_with_update(
             'find_one_and_update',
             projection_fields=projection_fields,
@@ -694,6 +840,19 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> Any:
+        """find one and replace
+
+        Args:
+            operation (str): operation name
+            projection_fields (Optional[list], optional): prejection. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): sort fields. Defaults to None.
+            sort (Optional[int], optional): -1 or 1. Defaults to None.
+            upsert (bool, optional): True/False. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            Union[Dict, 'MongoModel']: MongoModel or Dict
+        """
         if not isinstance(replacement, dict):
             replacement = replacement.query_data
         return self._find_with_replacement_or_with_update(
@@ -710,6 +869,14 @@ class BaseQueryBuilder(ABC):
         )
 
     def drop_collection(self, force: bool = False) -> str:
+        """drop collection
+
+        Args:
+            force (bool, optional): if u wanna force drop. Defaults to False.
+
+        Returns:
+            str: result message
+        """
         drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'  # type: ignore
         if force:
             self.__query('drop', query_params={})
