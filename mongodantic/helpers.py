@@ -20,10 +20,9 @@ from pymongo.errors import (
     AutoReconnect,
     NetworkTimeout,
     ConnectionFailure,
-    WriteConcernError,
 )
 
-from .exceptions import MongoConnectionError, ValidationError
+from .exceptions import MongoConnectionError, MongoValidationError
 from .types import ObjectIdStr
 
 if TYPE_CHECKING:
@@ -64,6 +63,20 @@ class classproperty(classmethod):
 
 
 def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
+    """extra helper value validation
+
+    Args:
+        cls (Type[): mongo model instance
+        field_name (str): name of field
+        value (Any): value
+
+    Raises:
+        AttributeError: if not field in __fields__
+        MongoValidationError: if invalid value type
+
+    Returns:
+        Any: value
+    """
     if field_name == '_id':
         field = ObjectIdStr()  # type: ignore
     else:
@@ -79,11 +92,13 @@ def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
     else:
         value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
     if error_:
-        raise ValidationError([error_], type(value))
+        raise MongoValidationError([error_], type(value))
     return value
 
 
 class ExtraQueryMapper(object):
+    """extra mapper for __ queries like find(_id__in=[], name__regex='123') """
+
     def __init__(self, model: Type['BaseModel'], field_name: str):
         self.field_name = field_name
         self.model = model
@@ -117,7 +132,7 @@ class ExtraQueryMapper(object):
                     _validate_value(self.model, self.field_name, v) for v in list_values
                 ]
             }
-        except ValidationError:
+        except MongoValidationError:
             return {"$in": list_values}
 
     def regex(self, regex_value: str) -> dict:
@@ -162,7 +177,7 @@ class ExtraQueryMapper(object):
                     _validate_value(self.model, self.field_name, v) for v in list_values
                 ]
             }
-        except ValidationError:
+        except MongoValidationError:
             return {"$nin": list_values}
 
     def exists(self, boolean_value: bool) -> dict:
@@ -232,6 +247,8 @@ def bulk_query_generator(
     query_fields: Optional[List] = None,
     upsert=False,
 ) -> List:
+    """"helper for generate bulk query"""
+
     data = []
     if updated_fields:
         for obj in requests:
@@ -256,6 +273,15 @@ def bulk_query_generator(
 
 
 def handle_and_convert_connection_errors(func: Callable) -> Any:
+    """decorator for handle connection errors and raise MongoConnectionError
+
+    Args:
+        func (Callable):any query to mongo
+
+    Returns:
+        Any: data
+    """
+
     def generator_wrapper(generator):
         yield from generator
 
@@ -267,8 +293,6 @@ def handle_and_convert_connection_errors(func: Callable) -> Any:
                 if isinstance(result, GeneratorType):
                     result = generator_wrapper(result)
                 return result
-            except (WriteConcernError,) as e:
-                raise MongoConnectionError(str(e))
             except (
                 AutoReconnect,
                 ServerSelectionTimeoutError,
@@ -303,6 +327,8 @@ def sort_validation(
 def group_by_aggregate_generation(
     group_by: Union[str, list, tuple]
 ) -> Union[str, dict]:
+    """group by parametr generation helper"""
+
     if isinstance(group_by, (list, tuple)):
         return {
             g if '.' not in g else g.split('.')[-1]: f'${g}' if '$' not in g else g

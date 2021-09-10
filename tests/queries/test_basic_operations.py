@@ -3,7 +3,7 @@ import pytest
 import asyncio
 from bson import ObjectId
 
-from mongodantic import init_db_connection_params
+from mongodantic import connect
 from mongodantic.models import MongoModel
 from mongodantic.session import Session
 from mongodantic.exceptions import DoesNotExist
@@ -11,7 +11,7 @@ from mongodantic.exceptions import DoesNotExist
 
 class TestBasicOperation(unittest.TestCase):
     def setUp(self):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
             name: str

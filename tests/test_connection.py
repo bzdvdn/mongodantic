@@ -1,6 +1,6 @@
 import unittest
 import os
-from mongodantic import init_db_connection_params
+from mongodantic import connect
 from mongodantic.connection import _DBConnection, _connection_settings
 from mongodantic.connection import DEFAULT_CONNECTION_NAME
 from pymongo import MongoClient
@@ -8,7 +8,7 @@ from pymongo import MongoClient
 
 class TestWriteConnectionParams(unittest.TestCase):
     def setUp(self):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
         self.connection = _DBConnection(str(os.getpid()))
 
     def test_connection_params(self):

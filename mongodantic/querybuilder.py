@@ -18,7 +18,7 @@ from pymongo.client_session import ClientSession
 from bson import ObjectId
 
 from .exceptions import (
-    ValidationError,
+    MongoValidationError,
     MongoIndexError,
 )
 from .helpers import (
@@ -55,6 +55,18 @@ class BaseQueryBuilder(ABC):
         logical: bool = False,
         **kwargs,
     ) -> Any:
+        """main query function
+
+        Args:
+            method_name (str): query method like find, find_one and other
+            query_params (Union[List, Dict, str, Query, LogicalCombination]): query params: dict or Query or LogicalCombination
+            set_values (Optional[Dict], optional): for updated method. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+            logical (bool, optional): if logical. Defaults to False.
+
+        Returns:
+            Any: query result
+        """
         if logical:
             query_params = self._mongo_model._check_query_args(query_params)
         elif isinstance(query_params, dict):
@@ -71,6 +83,11 @@ class BaseQueryBuilder(ABC):
         return method(*query)
 
     def check_indexes(self) -> dict:
+        """get indexes for this collection
+
+        Returns:
+            dict: indexes result
+        """
         index_list = list(self.__query('list_indexes', {}))
         return_data = {}
         for index in index_list:
@@ -110,6 +127,14 @@ class BaseQueryBuilder(ABC):
             session=session,
             logical=bool(logical_query),
         )
+
+    def count_documents(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> int:
+        return self.count(logical_query, session, **query)
 
     def find_one(
         self,
@@ -181,6 +206,19 @@ class BaseQueryBuilder(ABC):
         sort: Optional[int] = None,
         **query,
     ) -> tuple:
+        """find and count
+
+        Args:
+            logical_query (Union[Query, LogicalCombination, None], optional): Query|LogicalCombination or None. Defaults to None.
+            skip_rows (Optional[int], optional): for pagination. Defaults to None.
+            limit_rows (Optional[int], optional): for pagination. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+            sort_fields (Optional[Union[Tuple, List]], optional): field for sort. Defaults to None.
+            sort (Optional[int], optional): sort value. Defaults to None.
+
+        Returns:
+            tuple: count of query data, QuerySet
+        """
         count = self.count(session=session, logical_query=logical_query, **query,)
         results = self.find(
             skip_rows=skip_rows,
@@ -226,7 +264,6 @@ class BaseQueryBuilder(ABC):
         self,
         logical_query: Union[Query, LogicalCombination, None] = None,
         session: Optional[ClientSession] = None,
-        *args,
         **query,
     ) -> int:
 
@@ -238,10 +275,12 @@ class BaseQueryBuilder(ABC):
         )
         return r.deleted_count
 
-    def _ensure_update_data(self, **fields) -> tuple:
+    def _prepare_update_data(self, **fields) -> tuple:
+        """prepare and validate query data for update queries"""
+
         if not any("__set" in f for f in fields):
-            raise ValueError("not fields for updating!")
-        queries = {}
+            raise MongoValidationError("not fields for updating!")
+        query_params = {}
         set_values = {}
         for name, value in fields.items():
             if name.endswith('__set'):
@@ -249,8 +288,8 @@ class BaseQueryBuilder(ABC):
                 data = self._mongo_model._validate_query_data({name: value})
                 set_values.update(data)
             else:
-                queries.update({name: value})
-        return queries, set_values
+                query_params.update({name: value})
+        return query_params, set_values
 
     def replace_one(
         self,
@@ -259,10 +298,24 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **filter_query,
     ) -> Any:
+        """replace one 
+
+        Args:
+            replacement (Dict): replacement object
+            upsert (bool, optional): pymongo upsert. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Raises:
+            MongoValidationError: if not filter query
+            MongoValidationError: if not replacement obj
+
+        Returns:
+            Any: pymongo replace_one query result
+        """
         if not filter_query:
-            raise AttributeError('not filter parameters')
+            raise MongoValidationError('not filter parameters')
         if not replacement:
-            raise AttributeError('not replacement parameters')
+            raise MongoValidationError('not replacement parameters')
         return self.__query(
             'replace_one',
             self._mongo_model._validate_query_data(filter_query),
@@ -313,6 +366,11 @@ class BaseQueryBuilder(ABC):
         return parsed_query
 
     def get_or_create(self, **query) -> Tuple:
+        """like django orm get_or_create
+
+        Returns:
+            Tuple: MongoModel instance, True/False
+        """
         defaults = query.pop('defaults', {})
         obj = self.find_one(**query)
         if obj:
@@ -324,6 +382,11 @@ class BaseQueryBuilder(ABC):
         return obj, created
 
     def update_or_create(self, **query) -> Tuple:
+        """like django orm update_or_create
+
+        Returns:
+            Tuple: MongoModel instance, True/False
+        """
         defaults = query.pop('defaults', {})
         obj = self.find_one(**query)
         if obj:
@@ -344,8 +407,11 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
     ) -> Any:
         parsed_query = self.__validate_raw_query(method_name, raw_query)
-        query = getattr(self._mongo_model._collection, method_name)
-        return query(*parsed_query, session=session)
+        try:
+            query = getattr(self._mongo_model._collection, method_name)
+            return query(*parsed_query, session=session)
+        except AttributeError:
+            raise MongoValidationError('invalid method name')
 
     def _update(
         self,
@@ -354,7 +420,7 @@ class BaseQueryBuilder(ABC):
         upsert: bool = True,
         session: Optional[ClientSession] = None,
     ) -> int:
-        query, set_values = self._ensure_update_data(**query)
+        query, set_values = self._prepare_update_data(**query)
         r = self.__query(
             method, query, {'$set': set_values}, upsert=upsert, session=session
         )
@@ -453,6 +519,16 @@ class BaseQueryBuilder(ABC):
         upsert: bool = False,
         session: Optional[ClientSession] = None,
     ) -> None:
+        """base bulk operation method
+
+        Args:
+            models (List): MongoModels objects
+            updated_fields (Optional[List], optional): list of updated fields. Defaults to None.
+            query_fields (Optional[List], optional): list of query fields. Defaults to None.
+            batch_size (Optional[int], optional): query batch. Defaults to 10000.
+            upsert (bool, optional): for upsert pymongo queries. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+        """
         if batch_size is not None and batch_size > 0:
             for requests in chunk_by_length(models, batch_size):
                 data = bulk_query_generator(
@@ -478,21 +554,44 @@ class BaseQueryBuilder(ABC):
         batch_size: Optional[int] = None,
         session: Optional[ClientSession] = None,
     ) -> None:
+        """bulk update method
+
+        Args:
+            models (List): MongoModel objects
+            updated_fields (List): list of updated fields, like ['name', 'last_name']
+            batch_size (Optional[int], optional): query batch. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Raises:
+            MongoValidationError: if invalid param
+        """
         if not updated_fields:
-            raise ValidationError('updated_fields cannot be empty')
-        return self._bulk_operation(
+            raise MongoValidationError('updated_fields cannot be empty')
+        self._bulk_operation(
             models,
             updated_fields=updated_fields,
-            batch_size=batch_size,
+            batch_size=batch_size
+            if batch_size is not None and batch_size > 0
+            else 10000,
             session=session,
         )
 
     def bulk_create(
         self,
         models: List,
-        batch_size: Optional[int] = None,
+        batch_size: Optional[int] = 30000,
         session: Optional[ClientSession] = None,
     ) -> int:
+        """bulk create method
+
+        Args:
+            models (List): MongoModels obejcts
+            batch_size (Optional[int], optional): query batch. Defaults to None.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: count of objects created
+        """
         if batch_size is None or batch_size <= 0:
             batch_size = 30000
         result = 0
@@ -507,9 +606,21 @@ class BaseQueryBuilder(ABC):
         batch_size: Optional[int] = 10000,
         session: Optional[ClientSession] = None,
     ) -> None:
+        """Method for update/create rows
+
+        Args:
+            models (List): List of MongoModels objects
+            query_fields (List): list of query fields like ['name'], perfect if this fields in indexes
+            batch_size (Optional[int], optional): query obejcts batch. Defaults to 10000.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Raises:
+            MongoValidationError: if invalid models
+
+        """
         if not query_fields:
-            raise ValidationError('query_fields cannot be empty')
-        return self._bulk_operation(
+            raise MongoValidationError('query_fields cannot be empty')
+        self._bulk_operation(
             models,
             query_fields=query_fields,
             batch_size=batch_size,
@@ -527,7 +638,7 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **query,
     ) -> Any:
-        filter_, set_values = self._ensure_update_data(**query)
+        filter_, set_values = self._prepare_update_data(**query)
         return_document = ReturnDocument.AFTER
         replacement = query.pop('replacement', None)
 
@@ -658,6 +769,15 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         return QuerySet(self._mongo_model, data)
 
     @no_type_check
+    async def count_documents(
+        self,
+        logical_query: Union[Query, LogicalCombination, None] = None,
+        session: Optional[ClientSession] = None,
+        **query,
+    ) -> int:
+        return await self.cont(logical_query, session, **query)
+
+    @no_type_check
     async def get_or_create(self, **query) -> Tuple:
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
@@ -716,7 +836,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         session: Optional[ClientSession] = None,
     ) -> None:
         if not updated_fields:
-            raise ValidationError('updated_fields cannot be empty')
+            raise MongoValidationError('updated_fields cannot be empty')
         await self._bulk_operation(
             models,
             updated_fields=updated_fields,
@@ -733,7 +853,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         session: Optional[ClientSession] = None,
     ) -> Coroutine[Any, Any, None]:
         if not query_fields:
-            raise ValidationError('query_fields cannot be empty')
+            raise MongoValidationError('query_fields cannot be empty')
         await self._bulk_operation(
             models,
             query_fields=query_fields,

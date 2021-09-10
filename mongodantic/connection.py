@@ -21,12 +21,14 @@ def connect(
     ssl: bool = False,
     max_pool_size: int = 100,
     ssl_cert_path: Optional[str] = None,
-    server_selection_timeout_ms: int = 50000,
-    connect_timeout_ms: int = 50000,
-    socket_timeout_ms: int = 50000,
-    env_name: str = DEFAULT_CONNECTION_NAME,
+    server_selection_timeout_ms: int = 60000,
+    connect_timeout_ms: int = 30000,
+    socket_timeout_ms: int = 60000,
+    env_name: Optional[str] = None,
 ) -> None:
-    _connection_settings[env_name] = {
+    set_connection_env(env_name)
+    connection_env = get_connection_env()
+    _connection_settings[connection_env] = {
         'connection_str': connection_str,
         'dbname': dbname,
         'ssl': ssl,
@@ -36,11 +38,11 @@ def connect(
         'socket_timeout_ms': socket_timeout_ms,
         'ssl_cert_path': ssl_cert_path,
     }
-    _get_connection(str(os.getpid()))
+    _get_connection(str(os.getpid()), env_name=connection_env)
 
 
-def set_connection_env(name: str = DEFAULT_CONNECTION_NAME):
-    os.environ['MONGODANTIC_DB_ENV'] = name
+def set_connection_env(name: Optional[str] = None):
+    os.environ['MONGODANTIC_DB_ENV'] = name if name else DEFAULT_CONNECTION_NAME
 
 
 def get_connection_env() -> str:
@@ -49,11 +51,11 @@ def get_connection_env() -> str:
 
 class _DBConnection(object):
     def __init__(
-        self, alias: str = str(os.getpid()), env_name: str = DEFAULT_CONNECTION_NAME
+        self, alias: str = str(os.getpid()), env_name: str = get_connection_env()
     ):
         self._alias = alias
         if env_name not in _connection_settings:
-            raise RuntimeError('not execute `connect` or not connection settings')
+            raise RuntimeError('not execute `connect` or empty connection settings')
         self.connection_string = _connection_settings[env_name]['connection_str']
         self.db_name = _connection_settings[env_name]['dbname']
         self.max_pool_size = _connection_settings[env_name]['pool_size']
@@ -65,7 +67,7 @@ class _DBConnection(object):
         self.connect_timeout_ms = _connection_settings[env_name]['connect_timeout_ms']
         self.socket_timeout_ms = _connection_settings[env_name]['socket_timeout_ms']
         self._mongo_connection = self._init_mongo_connection()
-        self._database = None
+        self._database: Optional[database.Database] = None
 
     def _init_mongo_connection(self, connect: bool = False) -> MongoClient:
         connection_params = dict(
@@ -102,9 +104,7 @@ class _DBConnection(object):
         self.close()
 
 
-def _get_connection(
-    alias: str, env_name: str = DEFAULT_CONNECTION_NAME
-) -> _DBConnection:
+def _get_connection(alias: str, env_name: str = get_connection_env()) -> _DBConnection:
     connection = _connections.get(str(alias))
     if not connection:
         connection = _DBConnection(str(alias), env_name=env_name)
@@ -119,9 +119,9 @@ def init_db_connection_params(
     ssl: bool = False,
     max_pool_size: int = 100,
     ssl_cert_path: Optional[str] = None,
-    server_selection_timeout_ms: int = 50000,
-    connect_timeout_ms: int = 50000,
-    socket_timeout_ms: int = 50000,
+    server_selection_timeout_ms: int = 60000,
+    connect_timeout_ms: int = 30000,
+    socket_timeout_ms: int = 60000,
     env_name: str = DEFAULT_CONNECTION_NAME,
 ):
     return connect(**locals())

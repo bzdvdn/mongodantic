@@ -4,13 +4,13 @@ from bson import ObjectId
 from uuid import uuid4, UUID
 
 from mongodantic.models import MongoModel
-from mongodantic import init_db_connection_params
-from mongodantic.exceptions import ValidationError
+from mongodantic import connect
+from mongodantic.exceptions import MongoValidationError
 
 
 class TestBasicOperation(unittest.TestCase):
     def setUp(self):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
 
         class User(MongoModel):
             id: UUID
@@ -24,7 +24,7 @@ class TestBasicOperation(unittest.TestCase):
         self.User = User
 
     def test_raw_insert_one(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             result = self.User.Q.raw_query(
                 'insert_one', {'id': uuid4(), 'name': {}, 'email': []}
             )
@@ -35,7 +35,7 @@ class TestBasicOperation(unittest.TestCase):
 
     @pytest.mark.asyncio
     async def test_async_raw_insert_one(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             result = await self.User.AQ.raw_query(
                 'insert_one', {'id': uuid4(), 'name': {}, 'email': []}
             )
@@ -46,7 +46,7 @@ class TestBasicOperation(unittest.TestCase):
 
     @pytest.mark.asyncio
     async def test_async_raw_insert_many(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             result = await self.User.AQ.raw_query(
                 'insert_many', [{'id': uuid4(), 'name': {}, 'email': []}]
             )
@@ -70,7 +70,7 @@ class TestBasicOperation(unittest.TestCase):
 
     def test_raw_update_one(self):
         self.test_raw_insert_one()
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             result = self.User.Q.raw_query(
                 'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
             )
@@ -86,7 +86,7 @@ class TestBasicOperation(unittest.TestCase):
     @pytest.mark.asyncio
     async def test_async_raw_update_one(self):
         await self.test_async_raw_insert_one()
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             result = await self.User.AQ.raw_query(
                 'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
             )

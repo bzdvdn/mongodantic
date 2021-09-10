@@ -14,7 +14,7 @@ from .connection import _DBConnection, _get_connection
 from .types import ObjectIdStr
 from .exceptions import (
     NotDeclaredField,
-    ValidationError,
+    MongoValidationError,
     InvalidArgsParams,
 )
 from .helpers import (
@@ -86,8 +86,12 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
                 "_collection_name",
                 "_collection",
                 "querybuilder",
+                "Q",
+                "AQ",
+                "async_querybuilder",
                 "pk",
                 "query_data",
+                "fields_all",
                 "all_fields",
             )
             and isinstance(getattr(cls, prop), property)
@@ -120,7 +124,15 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return field_param, extra
 
     @classmethod
-    def _validate_query_data(cls, query: Dict) -> Dict:
+    def _validate_query_data(cls, query: Dict) -> 'DictStrAny':
+        """main validation method
+
+        Args:
+            query (Dict): basic query
+
+        Returns:
+            Dict: parsed query
+        """
         data = {}
         for field, value in query.items():
             field, *extra_params = field.split("__")
@@ -140,7 +152,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return data
 
     @classproperty
-    def all_fields(cls) -> list:
+    def fields_all(cls) -> list:
         fields = list(cls.__fields__.keys())
         return_fields = fields + cls._get_properties()
         return return_fields
@@ -151,7 +163,18 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         logical_query: Union[
             List[Any], Dict[Any, Any], str, Query, LogicalCombination
         ] = None,
-    ) -> Dict:
+    ) -> 'DictStrAny':
+        """check if query = Query obj or LogicCombination
+
+        Args:
+            logical_query (Union[ List[Any], Dict[Any, Any], str, Query, LogicalCombination ], optional): Query | LogicCombination. Defaults to None.
+
+        Raises:
+            InvalidArgsParams: if not Query | LogicCombination
+
+        Returns:
+            Dict: generated query dict
+        """
         if not isinstance(logical_query, (LogicalCombination, Query)):
             raise InvalidArgsParams()
         return logical_query.to_query(cls)
@@ -179,6 +202,10 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         exclude_none: bool = False,
         with_props: bool = True,
     ) -> 'DictStrAny':
+        """
+        Generate a dictionary representation of the model, optionally specifying which fields to include or exclude.
+
+        """
         attribs = super().dict(
             include=include,
             exclude=exclude,
@@ -202,18 +229,18 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
 
         return attribs
 
-    def _data(self, with_props: bool = True) -> Dict:
+    def _data(self, with_props: bool = True) -> 'DictStrAny':
         data = self.dict(with_props=with_props)
         if '_id' in data:
             data['_id'] = data['_id'].__str__()
         return data
 
     @property
-    def data(self) -> Dict:
+    def data(self) -> 'DictStrAny':
         return self._data(with_props=True)
 
     @property
-    def query_data(self) -> Dict:
+    def query_data(self) -> 'DictStrAny':
         return self._data(with_props=False)
 
     @classmethod
@@ -232,6 +259,11 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def set_collection_name(cls) -> str:
+        """main method for set collection
+
+        Returns:
+            str: collection name
+        """
         return cls.__name__.lower()
 
     @classmethod
@@ -273,6 +305,8 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
 
     @classmethod
     def execute_indexes(cls):
+        """method for create/update/delete indexes if indexes declared in Config property"""
+
         indexes = getattr(cls.__config__, 'indexes', [])
         if not all([isinstance(index, IndexModel) for index in indexes]):
             raise ValueError('indexes must be list of IndexModel instances')
@@ -305,7 +339,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             data = {'_id': ObjectId(self._id)}
             if updated_fields:
                 if not all(field in self.__fields__ for field in updated_fields):
-                    raise ValidationError('invalid field in updated_fields')
+                    raise MongoValidationError('invalid field in updated_fields')
             else:
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:
@@ -344,7 +378,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             data = {'_id': ObjectId(self._id)}
             if updated_fields:
                 if not all(field in self.__fields__ for field in updated_fields):
-                    raise ValidationError('invalid field in updated_fields')
+                    raise MongoValidationError('invalid field in updated_fields')
             else:
                 updated_fields = tuple(self.__fields__.keys())
             for field in updated_fields:

@@ -3,13 +3,13 @@ import unittest
 import pytest
 from pymongo import IndexModel
 from mongodantic.models import MongoModel
-from mongodantic import init_db_connection_params
+from mongodantic import connect
 from mongodantic.exceptions import MongoIndexError
 
 
 class TestIndexOperation(unittest.TestCase):
     def setUp(self, drop=False, basic_indexes=True):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
             name: str

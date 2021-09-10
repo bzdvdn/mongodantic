@@ -29,10 +29,6 @@ class QuerySet(object):
         return [obj.data for obj in self.__iter__()]
 
     @property
-    def json(self) -> str:
-        return dumps(self.data)
-
-    @property
     def generator(self) -> Generator:
         return self.__iter__()
 
@@ -43,6 +39,9 @@ class QuerySet(object):
     @property
     def list(self) -> List:
         return list(self.__iter__())
+
+    def json(self) -> str:
+        return dumps(self.data)
 
     def first(self) -> Any:
         return next(self.__iter__())

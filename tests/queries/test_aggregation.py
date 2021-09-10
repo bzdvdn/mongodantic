@@ -6,7 +6,7 @@ from mongodantic.models import MongoModel, Query
 from mongodantic.types import ObjectIdStr
 from mongodantic import init_db_connection_params
 from mongodantic.aggregation import Sum, Max, Min, Avg, Count
-from mongodantic.exceptions import ValidationError
+from mongodantic.exceptions import MongoValidationError
 
 product_types = {1: 'phone', 2: 'book', 3: 'food'}
 
@@ -307,13 +307,14 @@ class TestAggregation(unittest.TestCase):
         assert result_not_match_agg == {}
 
     def test_raises_invalid_field(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             self.Product.Q.simple_aggregate(
                 title='not_match', aggregation=[Avg('cost123'), Max('quantityzzzz')]
             )
+
     @pytest.mark.asyncio
     async def test_async_raises_invalid_field(self):
-        with pytest.raises(ValidationError):
+        with pytest.raises(MongoValidationError):
             await self.Product.AQ.simple_aggregate(
                 title='not_match', aggregation=[Avg('cost123'), Max('quantityzzzz')]
             )

@@ -1,5 +1,3 @@
-import json
-import time
 from json import dumps
 
 from pydantic import ValidationError
@@ -22,7 +20,7 @@ app = Flask(__name__)
 @app.route('/', methods=['GET', 'POST'])
 def books():
     if request.method == 'GET':
-        books = Book.querybuilder.find().data
+        books = Book.Q.find().data
         return books.json
     if request.method == 'POST':
         name = request.form.get('name')
@@ -38,7 +36,7 @@ def books():
 @app.route('/', methods=['GET', 'DELETE'])
 def books(book_id):
     if request.method == 'GET':
-        book = Book.querybuilder.find_one(_id=book_id)
+        book = Book.Q.find_one(_id=book_id)
         if book:
             return Response(book.json())
         return Response(
@@ -48,7 +46,7 @@ def books(book_id):
         )
     if request.method == 'DELETE':
         try:
-            book = Book.querybuilder.delete_one(_id=book_id)
+            book = Book.Q.delete_one(_id=book_id)
             return Response(status=204)
         except ValidationError as e:
             return Response(e.json(), headers={'Content-Type': 'json'})

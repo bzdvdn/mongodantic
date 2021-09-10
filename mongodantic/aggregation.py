@@ -1,7 +1,7 @@
 from abc import ABC
 from typing import TYPE_CHECKING, Any
 
-from .exceptions import ValidationError
+from .exceptions import MongoValidationError
 
 if TYPE_CHECKING:
     from .models import MongoModel
@@ -11,6 +11,8 @@ __all__ = ('Sum', 'Avg', 'Min', 'Count', 'Max')
 
 
 class BasicDefaultAggregation(ABC):
+    """Abstract class for Aggregation"""
+
     _operation: Any = None
 
     def __init__(self, field: str):
@@ -24,7 +26,7 @@ class BasicDefaultAggregation(ABC):
 
     def _validate_field(self, mongo_model: 'MongoModel'):
         if self.field not in mongo_model.__fields__ and self.field != '_id':
-            raise ValidationError(
+            raise MongoValidationError(
                 f'invalid field "{self.field}" for this model, field must be one of {list(mongo_model.__fields__.keys())}'
             )
 

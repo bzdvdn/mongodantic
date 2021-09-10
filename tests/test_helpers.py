@@ -4,12 +4,12 @@ import pytest
 
 from mongodantic.helpers import ExtraQueryMapper
 from mongodantic.models import MongoModel
-from mongodantic import init_db_connection_params
+from mongodantic import connect
 
 
 class TestExtraQueryMapper(unittest.TestCase):
     def setUp(self):
-        init_db_connection_params("mongodb://127.0.0.1:27017", "test")
+        connect("mongodb://127.0.0.1:27017", "test")
 
         class User(MongoModel):
             id: str

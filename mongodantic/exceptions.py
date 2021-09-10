@@ -16,7 +16,7 @@ class InvalidArgument(BaseMongodanticException):
     pass
 
 
-class ValidationError(BaseMongodanticException):
+class MongoValidationError(BaseMongodanticException):
     pass
 
 

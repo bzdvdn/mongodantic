@@ -9,7 +9,7 @@ if TYPE_CHECKING:
     from .models import MongoModel
 
 
-def parse_query(model: 'MongoModel', query: dict) -> dict:
+def _validate_query_data(model: 'MongoModel', query: dict) -> dict:
     return model._validate_query_data(query)
 
 
@@ -51,7 +51,7 @@ class SimplificationVisitor(QueryNodeVisitor):
         """
         combined_query = []
         for query in queries:
-            query = parse_query(self.model, query)
+            query = _validate_query_data(self.model, query)
             combined_query.append(copy.deepcopy(query))
         return combined_query
 
@@ -73,7 +73,7 @@ class QueryCompilerVisitor(QueryNodeVisitor):
         return {operator: combination.children}
 
     def visit_query(self, query: 'Query') -> Union['Query', dict]:
-        data = parse_query(self.model, query.query)
+        data = _validate_query_data(self.model, query.query)
         return data
 
 
