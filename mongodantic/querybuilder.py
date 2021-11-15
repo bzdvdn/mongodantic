@@ -473,7 +473,8 @@ class BaseQueryBuilder(ABC):
             obj.save()
         else:
             created = True
-            inserted_id = self.insert_one(**{**query, **defaults})
+            data = {**query, **defaults}
+            inserted_id = self.insert_one(**data)
             obj = self.find_one(_id=inserted_id)
         return obj, created
 
@@ -1086,7 +1087,8 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             await obj.save_async()
         else:
             created = True
-            inserted_id = await self.insert_one(**{**query, **defaults})
+            data = {**query, **defaults}
+            inserted_id = await self.insert_one(**data)
             obj = await self.find_one(_id=inserted_id)
         return obj, created
 
