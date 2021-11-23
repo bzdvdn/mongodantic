@@ -52,6 +52,17 @@ class TestBasicOperation(unittest.TestCase):
         assert new_obj.name == 'updated'
         assert new_obj.position == 2310
 
+    @pytest.mark.asyncio
+    async def test_async_bulk(self):
+        self.test_get_or_create()
+        obj = await self.Ticket.AQ.find_one(name='testerino1', position=222222)
+        obj.position = 2310
+        obj.name = 'updated'
+        await self.Ticket.AQ.bulk_update([obj], ['name', 'position'])
+        new_obj = await self.Ticket.AQ.find_one(_id=obj._id)
+        assert new_obj.name == 'updated'
+        assert new_obj.position == 2310
+
     def test_get_or_create(self):
         _, created = self.Ticket.Q.get_or_create(
             name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}

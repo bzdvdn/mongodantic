@@ -256,11 +256,10 @@ def bulk_query_generator(
     data = []
     if updated_fields:
         for obj in requests:
-            query = obj.data
-            query['_id'] = ObjectId(query['_id'])
+            query = {'_id': ObjectId(obj._id)}
             update = {}
             for field in updated_fields:
-                value = query.pop(field)
+                value = getattr(obj, field)
                 update.update({field: value})
             data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
     elif query_fields:
