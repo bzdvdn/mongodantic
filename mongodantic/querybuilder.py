@@ -943,7 +943,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        return await self.cont(logical_query, session, **query)
+        return await self.count(logical_query, session, **query)
 
     @no_type_check
     async def get_or_create(self, **query) -> Tuple:

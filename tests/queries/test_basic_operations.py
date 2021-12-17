@@ -331,7 +331,7 @@ class TestBasicOperation(unittest.TestCase):
         assert deleted == 2
 
     @pytest.mark.asyncio
-    async def test_delete_many(self):
+    async def test_async_delete_many(self):
         self.test_insert_many()
         deleted = await self.Ticket.AQ.delete_many(position=2)
         assert deleted == 2

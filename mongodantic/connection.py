@@ -12,7 +12,7 @@ __all__ = (
 
 DEFAULT_CONNECTION_NAME = 'default'
 _connections: dict = {}
-_connection_settings = {}
+_connection_settings: dict = {}
 
 
 def connect(
@@ -42,7 +42,7 @@ def connect(
 
 
 def set_connection_env(name: Optional[str] = None):
-    os.environ['MONGODANTIC_DB_ENV'] = name if name else DEFAULT_CONNECTION_NAME
+    os.environ['MONGODANTIC_DB_ENV'] = name or DEFAULT_CONNECTION_NAME
 
 
 def get_connection_env() -> str:

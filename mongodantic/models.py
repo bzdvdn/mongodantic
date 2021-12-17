@@ -73,7 +73,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         return value
 
     @classmethod
-    def _get_properties(cls):
+    def _get_properties(cls) -> list:
         return [
             prop
             for prop in dir(cls)
@@ -193,8 +193,8 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
     def dict(  # type: ignore
         self,
         *,
-        include: Union['AbstractSetIntStr'] = None,
-        exclude: Union['AbstractSetIntStr'] = None,
+        include: Optional['AbstractSetIntStr'] = None,
+        exclude: Optional['AbstractSetIntStr'] = None,
         by_alias: bool = False,
         skip_defaults: bool = None,
         exclude_unset: bool = False,
