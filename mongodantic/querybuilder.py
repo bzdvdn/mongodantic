@@ -43,7 +43,7 @@ __all__ = ('QueryBuilder', 'AsyncQueryBuilder')
 
 class BaseQueryBuilder(ABC):
     def __init__(self, mongo_model: 'MongoModel'):
-        self._mongo_model = mongo_model
+        self._mongo_model: 'MongoModel' = mongo_model
 
     @handle_and_convert_connection_errors
     def __query(
@@ -466,16 +466,14 @@ class BaseQueryBuilder(ABC):
         """
         defaults = query.pop('defaults', {})
         obj = self.find_one(**query)
-        if obj:
+        if obj is not None:
             created = False
             for field, value in defaults.items():
                 setattr(obj, field, value)
-            obj.save()
         else:
             created = True
-            data = {**query, **defaults}
-            inserted_id = self.insert_one(**data)
-            obj = self.find_one(_id=inserted_id)
+            obj = self._mongo_model(**{**query, **defaults})  # type: ignore
+        obj.save()
         return obj, created
 
     def raw_query(
@@ -484,6 +482,19 @@ class BaseQueryBuilder(ABC):
         raw_query: Union[Dict, List[Dict], Tuple[Dict]],
         session: Optional[ClientSession] = None,
     ) -> Any:
+        """pymongo raw query
+
+        Args:
+            method_name (str): pymongo method, like insert_one
+            raw_query (Union[Dict, List[Dict], Tuple[Dict]]): query data
+            session (Optional[ClientSession], optional): pymongo Session. Defaults to None.
+
+        Raises:
+            MongoValidationError: raise if invalid data
+
+        Returns:
+            Any: pymongo query result
+        """
         parsed_query = self.__validate_raw_query(method_name, raw_query)
         try:
             query = getattr(self._mongo_model._collection, method_name)
@@ -498,6 +509,17 @@ class BaseQueryBuilder(ABC):
         upsert: bool = True,
         session: Optional[ClientSession] = None,
     ) -> int:
+        """innert method for update
+
+        Args:
+            method (str): one of update_many or update_one
+            query (Dict): update query
+            upsert (bool, optional): upsert option. Defaults to True.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
+
+        Returns:
+            int: updated documents count
+        """
         query, set_values = self._prepare_update_data(**query)
         r = self.__query(
             method, query, {'$set': set_values}, upsert=upsert, session=session
@@ -534,7 +556,7 @@ class BaseQueryBuilder(ABC):
 
     def distinct(
         self, field: str, session: Optional[ClientSession] = None, **query
-    ) -> Union[list, dict]:
+    ) -> list:
         """wrapper for pymongo distinct
 
         Args:
@@ -542,17 +564,19 @@ class BaseQueryBuilder(ABC):
             session (Optional[ClientSession], optional): pymongo session. Defaults to None.
 
         Returns:
-            Union[list, dict]: result
+            list: list of distinct values
         """
         query = self._mongo_model._validate_query_data(query)
         method = getattr(self._mongo_model._collection, 'distinct')
         return method(key=field, filter=query, session=session)
 
-    def raw_aggregate(self, data: Any, session: Optional[ClientSession] = None) -> list:
+    def raw_aggregate(
+        self, data: List[Dict[Any, Any]], session: Optional[ClientSession] = None
+    ) -> list:
         """raw aggregation query
 
         Args:
-            data (Any): aggregation query
+            data (List[Dict[Any, Any]]): aggregation query
             session (Optional[ClientSession], optional): pymongo session. Defaults to None.
 
         Returns:
@@ -609,25 +633,25 @@ class BaseQueryBuilder(ABC):
             result_data.update({name: r} if name else r)
         return result_data
 
-    def simple_aggregate(self, *args, **kwargs):
+    def simple_aggregate(self, *args, **kwargs) -> dict:
         return self._aggregate(*args, **kwargs)
 
-    def aggregate_sum(self, agg_field: str, **query) -> dict:
+    def aggregate_sum(self, agg_field: str, **query) -> int:
         return self._aggregate(aggregation=Sum(agg_field), **query).get(
             f'{agg_field}__sum', 0
         )
 
-    def aggregate_max(self, agg_field: str, **query) -> dict:
+    def aggregate_max(self, agg_field: str, **query) -> int:
         return self._aggregate(aggregation=Max(agg_field), **query).get(
             f'{agg_field}__max', 0
         )
 
-    def aggregate_min(self, agg_field: str, **query) -> dict:
+    def aggregate_min(self, agg_field: str, **query) -> int:
         return self._aggregate(aggregation=Min(agg_field), **query).get(
             f'{agg_field}__min', 0
         )
 
-    def aggregate_avg(self, agg_field: str, **query) -> dict:
+    def aggregate_avg(self, agg_field: str, **query) -> int:
         return self._aggregate(aggregation=Avg(agg_field), **query).get(
             f'{agg_field}__avg', 0
         )
@@ -962,22 +986,22 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         return await self._aggregate(*args, **kwargs)
 
     @no_type_check
-    async def aggregate_sum(self, agg_field: str, **query) -> dict:
+    async def aggregate_sum(self, agg_field: str, **query) -> int:
         result = await self._aggregate(aggregation=Sum(agg_field), **query)
         return result.get(f'{agg_field}__sum', 0)
 
     @no_type_check
-    async def aggregate_max(self, agg_field: str, **query) -> dict:
+    async def aggregate_max(self, agg_field: str, **query) -> int:
         result = await self._aggregate(aggregation=Max(agg_field), **query)
         return result.get(f'{agg_field}__max', 0)
 
     @no_type_check
-    async def aggregate_min(self, agg_field: str, **query) -> dict:
+    async def aggregate_min(self, agg_field: str, **query) -> int:
         result = await self._aggregate(aggregation=Min(agg_field), **query)
         return result.get(f'{agg_field}__min', 0)
 
     @no_type_check
-    async def aggregate_avg(self, agg_field: str, **query) -> dict:
+    async def aggregate_avg(self, agg_field: str, **query) -> int:
         result = await self._aggregate(aggregation=Avg(agg_field), **query)
         return result.get(f'{agg_field}__avg', 0)
 
@@ -1080,16 +1104,15 @@ class AsyncQueryBuilder(BaseQueryBuilder):
     async def update_or_create(self, **query) -> Tuple:
         defaults = query.pop('defaults', {})
         obj = await self.find_one(**query)
-        if obj:
+        if obj is not None:
             created = False
             for field, value in defaults.items():
                 setattr(obj, field, value)
-            await obj.save_async()
+
         else:
             created = True
-            data = {**query, **defaults}
-            inserted_id = await self.insert_one(**data)
-            obj = await self.find_one(_id=inserted_id)
+            obj = self._mongo_model(**{**query, **defaults})
+        await obj.save_async()
         return obj, created
 
     @no_type_check

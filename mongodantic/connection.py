@@ -26,6 +26,19 @@ def connect(
     socket_timeout_ms: int = 60000,
     env_name: Optional[str] = None,
 ) -> None:
+    """init connection to mongodb
+
+    Args:
+        connection_str (str): full connection string
+        dbname (str): mongo db name
+        ssl (bool, optional): flag for ssl cert. Defaults to False.
+        max_pool_size (int, optional): max connection pool. Defaults to 100.
+        ssl_cert_path (Optional[str], optional): path to ssl cert. Defaults to None.
+        server_selection_timeout_ms (int, optional): ServerSelectionTimeoutMS. Defaults to 60000.
+        connect_timeout_ms (int, optional): ConnectionTimeoutMS. Defaults to 30000.
+        socket_timeout_ms (int, optional): SocketTimeoutMS. Defaults to 60000.
+        env_name (Optional[str], optional): connection env name. Defaults to None.
+    """
     set_connection_env(env_name)
     connection_env = get_connection_env()
     _connection_settings[connection_env] = {

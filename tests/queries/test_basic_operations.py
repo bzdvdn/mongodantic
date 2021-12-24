@@ -64,31 +64,33 @@ class TestBasicOperation(unittest.TestCase):
         assert new_obj.position == 2310
 
     def test_get_or_create(self):
-        _, created = self.Ticket.Q.get_or_create(
+        obj, created = self.Ticket.Q.get_or_create(
             name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}
         )
         assert created is True
-        _, created = self.Ticket.Q.get_or_create(
+        new_obj, created = self.Ticket.Q.get_or_create(
             name='testerino1', position=222222, config={}, defaults={'array': [22, 23]}
         )
         assert created is False
+        assert new_obj._id == obj._id
 
     @pytest.mark.asyncio
     async def test_async_get_or_create(self):
-        _, created = await self.Ticket.AQ.get_or_create(
+        old_obj, created = await self.Ticket.AQ.get_or_create(
             name='testerino1',
             position=444343434,
             config={},
             defaults={'array': [22, 23]},
         )
         assert created is True
-        _, created = await self.Ticket.AQ.get_or_create(
+        obj, created = await self.Ticket.AQ.get_or_create(
             name='testerino1',
             position=444343434,
             config={},
             defaults={'array': [22, 23]},
         )
         assert created is False
+        assert str(obj._id) == str(old_obj._id)
 
     def test_update_or_create(self):
         self.test_get_or_create()
@@ -100,12 +102,16 @@ class TestBasicOperation(unittest.TestCase):
 
     @pytest.mark.asyncio
     async def test_async_update_or_create(self):
-        self.test_get_or_create()
-        obj, created = await self.Ticket.AQ.update_or_create(
+        old_obj, created = await self.Ticket.AQ.update_or_create(
             name='testerino1', position=222222, config={}, defaults={'array': [23, 23]}
         )
-        assert created is False
-        assert obj.array[0] == 23
+        assert created is True
+        assert old_obj.array[0] == 23
+        obj, created = await self.Ticket.AQ.update_or_create(
+            name='testerino1', position=222222, config={}, defaults={'array': [24, 23]}
+        )
+        assert obj.array[0] == 24
+        assert str(old_obj._id) == str(obj._id)
 
     def test_reconnect(self):
         old_connection = self.Ticket._connection._mongo_connection
