@@ -102,7 +102,7 @@ class _DBConnection(object):
         return self.__init__(self._alias)
 
     def get_database(self) -> database.Database:
-        if hasattr(self, '_database') and self._database:
+        if hasattr(self, '_database') and self._database is not None:
             return self._database
         self._database = self._mongo_connection.get_database(self.db_name)
         return self._database
