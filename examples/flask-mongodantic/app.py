@@ -1,6 +1,7 @@
 from json import dumps
 
 from pydantic import ValidationError
+from pymongo.errors import InvalidId
 
 from flask import Flask, Response, request
 from mongodantic import connect, models
@@ -21,7 +22,7 @@ app = Flask(__name__)
 def books():
     if request.method == 'GET':
         books = Book.Q.find().data
-        return books.json
+        return {'books': books}
     if request.method == 'POST':
         name = request.form.get('name')
         author = request.form.get('author')
@@ -33,12 +34,15 @@ def books():
             return Response(e.json(), headers={'Content-Type': 'json'})
 
 
-@app.route('/', methods=['GET', 'DELETE'])
+@app.route('/<book_id>/', methods=['GET', 'DELETE'])
 def book_detail(book_id):
     if request.method == 'GET':
-        book = Book.Q.find_one(_id=book_id)
-        if book:
-            return Response(book.json())
+        try:
+            book = Book.Q.find_one(_id=book_id)
+            if book:
+                return Response(dumps(book.data))
+        except InvalidId:
+            pass
         return Response(
             dumps({'message': 'book does not exist.'}),
             headers={'Content-Type': 'json'},
@@ -46,7 +50,13 @@ def book_detail(book_id):
         )
     if request.method == 'DELETE':
         try:
-            book = Book.Q.delete_one(_id=book_id)
+            _ = Book.Q.delete_one(_id=book_id)
             return Response(status=204)
         except ValidationError as e:
             return Response(e.json(), headers={'Content-Type': 'json'})
+        except InvalidId:
+            Response(
+                dumps({'message': 'book does not exist.'}),
+                headers={'Content-Type': 'json'},
+                status=404,
+            )

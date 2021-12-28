@@ -24,7 +24,6 @@ class TestExtraQueryMapper(unittest.TestCase):
         with pytest.raises(TypeError):
             ExtraQueryMapper(self.User, 'name').extra_query(['in'], (1, 3))
         extra = ExtraQueryMapper(self.User, 'name').extra_query(['in'], [1, 3])
-        print(extra)
         value = {'name': {'$in': ['1', '3']}}
         assert extra == value
 

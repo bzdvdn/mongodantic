@@ -18,8 +18,8 @@ app = FastAPI()
 
 @app.get("/")
 async def books():
-    books = await Book.AQ.find().data
-    return books
+    books = await Book.AQ.find()
+    return books.data
 
 
 @app.post("/")

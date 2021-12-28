@@ -51,7 +51,9 @@ class ModelMetaclass(PydanticModelMetaclass):
                 async_querybuilder = AsyncQueryBuilder(cls)
                 setattr(cls, '__async_querybuilder__', async_querybuilder)
             # setattr(cls, 'querybuilder', querybuilder)
-
+        json_encoders = getattr(cls.Config, 'json_encoders', {})
+        json_encoders.update({ObjectId: lambda f: str(f)})
+        setattr(cls.Config, 'json_encoders', json_encoders)
         exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
         setattr(cls, '__indexes__', indexes)
         setattr(cls, '__exclude_fields__', exclude_fields)

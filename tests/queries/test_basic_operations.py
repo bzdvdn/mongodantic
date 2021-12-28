@@ -39,6 +39,12 @@ class TestBasicOperation(unittest.TestCase):
         assert new_obj.name == 'updated'
         assert new_obj.position == 2310
 
+    def test_json(self):
+        self.test_save()
+        obj = self.Ticket.Q.find_one(name='updated', position=2310)
+        js = obj.json()
+        assert js != {}
+
     @pytest.mark.asyncio
     async def test_async_save(self):
         self.test_get_or_create()
