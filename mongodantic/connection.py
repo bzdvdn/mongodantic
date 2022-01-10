@@ -108,10 +108,11 @@ class _DBConnection(object):
         return self._database
 
     def close(self) -> None:
-        old_connection = _connections.pop(self._alias, None)
-        if old_connection:
-            old_connection._mongo_connection.close()
-            del old_connection
+        if _connections:
+            old_connection = _connections.pop(self._alias, None)
+            if old_connection:
+                old_connection._mongo_connection.close()
+                del old_connection
 
     def __del__(self):
         self.close()
