@@ -1,11 +1,9 @@
-import unittest
-
 from mongodantic.models import MongoModel
 from mongodantic import connect
 
 
-class TestQueriesWithInners(unittest.TestCase):
-    def setUp(self):
+class TestQueriesWithInners:
+    def setup(self):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class InnerTicket(MongoModel):

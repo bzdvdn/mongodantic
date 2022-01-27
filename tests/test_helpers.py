@@ -1,5 +1,4 @@
 import re
-import unittest
 import pytest
 
 from mongodantic.helpers import ExtraQueryMapper
@@ -7,8 +6,8 @@ from mongodantic.models import MongoModel
 from mongodantic import connect
 
 
-class TestExtraQueryMapper(unittest.TestCase):
-    def setUp(self):
+class TestExtraQueryMapper:
+    def setup(self):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class User(MongoModel):

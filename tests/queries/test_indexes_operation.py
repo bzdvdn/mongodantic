@@ -7,8 +7,8 @@ from mongodantic import connect
 from mongodantic.exceptions import MongoIndexError
 
 
-class TestIndexOperation(unittest.TestCase):
-    def setUp(self, drop=False, basic_indexes=True):
+class TestIndexOperation:
+    def setup(self, drop=False, basic_indexes=True):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
@@ -28,7 +28,7 @@ class TestIndexOperation(unittest.TestCase):
         self.Ticket.execute_indexes()
 
     def test_check_indexes(self):
-        self.setUp(False)
+        self.setup(False)
         result = self.Ticket.querybuilder.check_indexes()
         assert result == {
             '_id_': {'key': {'_id': 1}},
@@ -37,7 +37,7 @@ class TestIndexOperation(unittest.TestCase):
         }
 
     def test_check_indexes_if_remove(self):
-        self.setUp(False, False)
+        self.setup(False, False)
         result = self.Ticket.querybuilder.check_indexes()
         assert result == {
             '_id_': {'key': {'_id': 1}},
@@ -45,10 +45,10 @@ class TestIndexOperation(unittest.TestCase):
         }
 
     def test_drop_index(self):
-        self.setUp(False)
+        self.setup(False)
         with pytest.raises(MongoIndexError):
             result = self.Ticket.querybuilder.drop_index('position1111')
 
         result = self.Ticket.querybuilder.drop_index('position_1')
         assert result == 'position_1 dropped.'
-        self.setUp(True, False)
+        self.setup(True, False)

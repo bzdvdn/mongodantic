@@ -1,18 +1,17 @@
-import unittest
 from mongodantic.logical import Query
 from mongodantic.models import MongoModel
 from mongodantic.connection import connect
 
 
-class TestLogicalQuery(unittest.TestCase):
-    def setUp(self):
+class TestLogicalQuery:
+    def setup(self):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
             name: str
             position: int
 
-        Ticket.querybuilder.drop_collection(force=True)
+        Ticket.Q.drop_collection(force=True)
         self.Ticket = Ticket
 
     def test_query_organization(self):
@@ -36,17 +35,17 @@ class TestLogicalQuery(unittest.TestCase):
             self.Ticket(name='first', position=1),
             self.Ticket(name='second', position=2),
         ]
-        inserted = self.Ticket.querybuilder.insert_many(query)
+        inserted = self.Ticket.Q.insert_many(query)
         assert inserted == 2
 
         query = Query(name='first') | Query(position=1) & Query(name='second')
-        data = self.Ticket.querybuilder.find_one(query)
+        data = self.Ticket.Q.find_one(query)
         assert data.name == 'first'
 
         query = Query(position=3) | Query(position=1) & Query(name='second')
-        data = self.Ticket.querybuilder.find_one(query)
+        data = self.Ticket.Q.find_one(query)
         assert data is None
 
         query = Query(position=3) | Query(position=2) & Query(name='second')
-        data = self.Ticket.querybuilder.find_one(query)
+        data = self.Ticket.Q.find_one(query)
         assert data.name == 'second'

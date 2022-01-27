@@ -8,9 +8,12 @@ def read(f):
 
 setup(
     name="mongodantic",
-    version='0.2.1b1',
+    version='0.2.2b1',
     packages=find_packages(exclude=("tests", "docs", "examples")),
-    install_requires=["pydantic>=1.3,<2", "pymongo>=3.10.1",],
+    install_requires=[
+        "pydantic>=1.3,<2",
+        "pymongo>=3.10.1",
+    ],
     description="Mongo ODM, based on pydantic and pymongo",
     author="bzdvdn",
     author_email="bzdv.dn@gmail.com",

@@ -1,6 +1,4 @@
-import unittest
 import pytest
-import asyncio
 from bson import ObjectId
 
 from mongodantic import connect
@@ -9,8 +7,8 @@ from mongodantic.session import Session
 from mongodantic.exceptions import DoesNotExist
 
 
-class TestBasicOperation(unittest.TestCase):
-    def setUp(self):
+class TestBasicOperation:
+    def setup(self):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class Ticket(MongoModel):
