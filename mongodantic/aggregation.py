@@ -64,4 +64,3 @@ class Count(BasicDefaultAggregation):
             f'count': {f'$sum': 1},
         }
         return query
-

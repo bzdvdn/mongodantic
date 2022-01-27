@@ -1,5 +1,5 @@
 import copy
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 
 __all__ = ("Query", "LogicalCombination")
@@ -14,24 +14,21 @@ def _validate_query_data(model: 'MongoModel', query: dict) -> dict:
 
 
 class QueryNodeVisitor(object):
-    """Base visitor class for visiting Query-object nodes in a query tree.
-    """
+    """Base visitor class for visiting Query-object nodes in a query tree."""
 
     def prepare_combination(
         self, combination: 'LogicalCombination'
     ) -> Union['LogicalCombination', dict]:
-        """Called by LogicalCombination objects.
-        """
+        """Called by LogicalCombination objects."""
         return combination
 
     def visit_query(self, query: 'Query') -> Union['Query', dict]:
-        """Called by (New)Query objects.
-        """
+        """Called by (New)Query objects."""
         return query
 
 
 class SimplificationVisitor(QueryNodeVisitor):
-    def __init__(self, model: Optional['MongoModel'] = None):
+    def __init__(self, model: 'MongoModel'):
         self.model = model
 
     def prepare_combination(
@@ -47,8 +44,7 @@ class SimplificationVisitor(QueryNodeVisitor):
         return combination
 
     def _query_conjunction(self, queries):
-        """Merges query dicts - effectively &ing them together.
-        """
+        """Merges query dicts - effectively &ing them together."""
         combined_query = []
         for query in queries:
             query = _validate_query_data(self.model, query)
@@ -83,7 +79,7 @@ class QueryNode(object):
     AND = 0
     OR = 1
 
-    def to_query(self, model) -> dict:
+    def to_query(self, model: 'MongoModel') -> dict:
         query = self.accept(SimplificationVisitor(model))
         if not isinstance(query, dict):
             query = query.accept(QueryCompilerVisitor(model))

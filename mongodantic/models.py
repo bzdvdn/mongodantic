@@ -1,6 +1,5 @@
 import os
-from json import dumps
-from abc import ABC
+import json
 from logging import getLogger
 from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING
 from pymongo.client_session import ClientSession
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
     from pydantic.typing import DictStrAny
     from pydantic.typing import AbstractSetIntStr  # noqa: F401
 
-__all__ = ('MongoModel', 'QuerySet', 'Query')
+__all__ = ('MongoModel', 'Query')
 
 logger = getLogger('mongodantic')
 
@@ -38,31 +37,31 @@ _is_mongo_model_class_defined = False
 
 
 class ModelMetaclass(PydanticModelMetaclass):
-    def __new__(mcs, name, bases, namespace, **kwargs):
+    def __new__(mcs, name, bases, namespace, **kwargs):  # type: ignore
         cls = super().__new__(mcs, name, bases, namespace, **kwargs)
         indexes = set()
         if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
             querybuilder = getattr(cls, '__querybuilder__')
             async_querybuilder = getattr(cls, '__async_querybuilder__')
             if querybuilder is None:
-                querybuilder = QueryBuilder(cls)
+                querybuilder = QueryBuilder(cls)  # type: ignore
                 setattr(cls, '__querybuilder__', querybuilder)
             if async_querybuilder is None:
-                async_querybuilder = AsyncQueryBuilder(cls)
+                async_querybuilder = AsyncQueryBuilder(cls)  # type: ignore
                 setattr(cls, '__async_querybuilder__', async_querybuilder)
             # setattr(cls, 'querybuilder', querybuilder)
-        json_encoders = getattr(cls.Config, 'json_encoders', {})
+        json_encoders = getattr(cls.Config, 'json_encoders', {})  # type: ignore
         json_encoders.update({ObjectId: lambda f: str(f)})
-        setattr(cls.Config, 'json_encoders', json_encoders)
-        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())
+        setattr(cls.Config, 'json_encoders', json_encoders)  # type: ignore
+        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())  # type: ignore
         setattr(cls, '__indexes__', indexes)
-        setattr(cls, '__exclude_fields__', exclude_fields)
+        setattr(cls, '__mongo_exclude_fields__', exclude_fields)
         return cls
 
 
-class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
+class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
     __indexes__: Set['str'] = set()
-    __exclude_fields__: Union[Tuple, List] = tuple()
+    __mongo_exclude_fields__: Union[Tuple, List] = tuple()
     __connection__: Optional[_DBConnection] = None
     __querybuilder__: Optional[QueryBuilder] = None
     __async_querybuilder__: Optional[AsyncQueryBuilder] = None
@@ -104,13 +103,14 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         obj = super().parse_obj(data)
         if '_id' in data:
             obj._id = data['_id']
+        # print(reference_fields)
         return obj
 
     @classmethod
     def __validate_field(cls, field: str) -> bool:
         if field not in cls.__fields__ and field != '_id':
             raise NotDeclaredField(field, list(cls.__fields__.keys()))
-        elif field in cls.__exclude_fields__:
+        elif field in cls.__mongo_exclude_fields__:
             return False
         return True
 
@@ -179,7 +179,7 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
         """
         if not isinstance(logical_query, (LogicalCombination, Query)):
             raise InvalidArgsParams()
-        return logical_query.to_query(cls)
+        return logical_query.to_query(cls)  # type: ignore
 
     @classmethod
     def _start_session(cls) -> ClientSession:
@@ -347,7 +347,8 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
             self.Q.update_one(
-                session=session, **data,
+                session=session,
+                **data,
             )
             return self
         data = {
@@ -355,8 +356,11 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = self.Q.insert_one(session=session, **data,)
-        self._id = object_id.__str__()
+        object_id = self.Q.insert_one(
+            session=session,
+            **data,
+        )
+        self._id = object_id
         return self
 
     def delete(self, session: Optional[ClientSession] = None) -> None:
@@ -386,7 +390,8 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
             await self.AQ.update_one(
-                session=session, **data,
+                session=session,
+                **data,
             )
             return self
         data = {
@@ -394,23 +399,24 @@ class BaseModel(ABC, BasePydanticModel, metaclass=ModelMetaclass):
             for field, value in self.__dict__.items()
             if field in self.__fields__
         }
-        object_id = await self.AQ.insert_one(session=session, **data,)
-        self._id = object_id.__str__()
+        object_id = await self.AQ.insert_one(
+            session=session,
+            **data,
+        )
+        self._id = object_id
         return self
 
-
-class MongoModel(BaseModel):
     def __hash__(self):
         if self.pk is None:
             raise TypeError("MongoModel instances without _id value are unhashable")
         return hash(self.pk)
 
-    def serialize(self, fields: Union[Tuple, List]) -> dict:
+    def serialize(self, fields: Union[Tuple, List]) -> 'DictStrAny':
         data: dict = self.dict(include=set(fields))
         return {f: data[f] for f in fields}
 
     def serialize_json(self, fields: Union[Tuple, List]) -> str:
-        return dumps(self.serialize(fields))
+        return json.dumps(self.serialize(fields))
 
     @property
     def pk(self):

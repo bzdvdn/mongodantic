@@ -7,11 +7,9 @@ from typing import (
     Tuple,
     TYPE_CHECKING,
     Generator,
-    Coroutine,
     no_type_check,
 )
 from collections.abc import Iterable
-from abc import ABC
 from pymongo import ReturnDocument
 from pymongo import IndexModel
 from pymongo.client_session import ClientSession
@@ -41,7 +39,7 @@ if TYPE_CHECKING:
 __all__ = ('QueryBuilder', 'AsyncQueryBuilder')
 
 
-class BaseQueryBuilder(ABC):
+class QueryBuilder(object):
     def __init__(self, mongo_model: 'MongoModel'):
         self._mongo_model: 'MongoModel' = mongo_model
 
@@ -97,7 +95,9 @@ class BaseQueryBuilder(ABC):
         return return_data
 
     def create_indexes(
-        self, indexes: List[IndexModel], session: Optional[ClientSession] = None,
+        self,
+        indexes: List[IndexModel],
+        session: Optional[ClientSession] = None,
     ) -> List[str]:
         return self.__query('create_indexes', indexes, session=session)
 
@@ -261,7 +261,11 @@ class BaseQueryBuilder(ABC):
         Returns:
             tuple: count of query data, QuerySet
         """
-        count = self.count(session=session, logical_query=logical_query, **query,)
+        count = self.count(
+            session=session,
+            logical_query=logical_query,
+            **query,
+        )
         results = self.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,
@@ -373,7 +377,7 @@ class BaseQueryBuilder(ABC):
         session: Optional[ClientSession] = None,
         **filter_query,
     ) -> Any:
-        """replace one 
+        """replace one
 
         Args:
             replacement (Dict): replacement object
@@ -915,34 +919,74 @@ class BaseQueryBuilder(ABC):
         return 'nope'
 
 
-class QueryBuilder(BaseQueryBuilder):
-    pass
+class AsyncQueryBuilder(QueryBuilder):
+    @sync_to_async
+    def __query(self, *args, **kwargs):
+        return super().__query(*args, **kwargs)
 
+    @sync_to_async
+    def insert_one(self, *args, **kwargs):
+        return super().insert_one(*args, **kwargs)
 
-class AsyncQueryBuilder(BaseQueryBuilder):
-    def __getattribute__(self, name: str) -> Any:
-        declared_methods = (
-            'find_one',
-            '_find',
-            'delete_one',
-            'delete_many',
-            'insert_one',
-            'insert_many',
-            'update_one',
-            'update_many',
-            'count',
-            'distinct',
-            'raw_aggregate',
-            'raw_query',
-            'replace_one',
-            '__query',
-            '_find_with_replacement_or_with_update',
-            '_aggregate',
-            '_bulk_operation',
-        )
-        if name in declared_methods:
-            return sync_to_async(super().__getattribute__(name))
-        return super().__getattribute__(name)
+    @sync_to_async
+    def insert_many(self, *args, **kwargs):
+        return super().insert_many(*args, **kwargs)
+
+    @sync_to_async
+    def delete_one(self, *args, **kwargs):
+        return super().delete_one(*args, **kwargs)
+
+    @sync_to_async
+    def delete_many(self, *args, **kwargs):
+        return super().delete_many(*args, **kwargs)
+
+    @sync_to_async
+    def update_one(self, *args, **kwargs):
+        return super().update_one(*args, **kwargs)
+
+    @sync_to_async
+    def update_many(self, *args, **kwargs):
+        return super().update_many(*args, **kwargs)
+
+    @sync_to_async
+    def distinct(self, *args, **kwargs):
+        return super().distinct(*args, **kwargs)
+
+    @sync_to_async
+    def raw_aggregate(self, *args, **kwargs):
+        return super().raw_aggregate(*args, **kwargs)
+
+    @sync_to_async
+    def raw_query(self, *args, **kwargs):
+        return super().raw_query(*args, **kwargs)
+
+    @sync_to_async
+    def replace_one(self, *args, **kwargs):
+        return super().replace_one(*args, **kwargs)
+
+    @sync_to_async
+    def _find(self, *args, **kwargs):
+        return super()._find(*args, **kwargs)
+
+    @sync_to_async
+    def find_one(self, *args, **kwargs):
+        return super().find_one(*args, **kwargs)
+
+    @sync_to_async
+    def _aggregate(self, *args, **kwargs):
+        return super()._aggregate(*args, **kwargs)
+
+    @sync_to_async
+    def _bulk_operation(self, *args, **kwargs):
+        return super()._bulk_operation(*args, **kwargs)
+
+    @sync_to_async
+    def _find_with_replacement_or_with_update(self, *args, **kwargs):
+        return super()._find_with_replacement_or_with_update(*args, **kwargs)
+
+    @sync_to_async
+    def count(self, *args, **kwargs):
+        return super().count(*args, **kwargs)
 
     @no_type_check
     async def find(
@@ -955,7 +999,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> QuerySet:
-        data = await self._find(
+        data = await self._find(  # type: ignore
             logical_query, skip_rows, limit_rows, session, sort_fields, sort, **query
         )
         return QuerySet(self._mongo_model, data)
@@ -967,7 +1011,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        return await self.count(logical_query, session, **query)
+        return await self.count(logical_query, session, **query)  # type: ignore
 
     @no_type_check
     async def get_or_create(self, **query) -> Tuple:
@@ -1043,7 +1087,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         query_fields: List,
         batch_size: Optional[int] = 10000,
         session: Optional[ClientSession] = None,
-    ) -> Coroutine[Any, Any, None]:
+    ) -> None:
         if not query_fields:
             raise MongoValidationError('query_fields cannot be empty')
         await self._bulk_operation(
@@ -1071,7 +1115,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
             **query,
         )
         if not obj:
-            raise DoesNotExist(self._mongo_model.__name__)
+            raise DoesNotExist(self._mongo_model.__name__)  # type: ignore
         return obj
 
     @no_type_check
@@ -1111,7 +1155,7 @@ class AsyncQueryBuilder(BaseQueryBuilder):
 
         else:
             created = True
-            obj = self._mongo_model(**{**query, **defaults})
+            obj = self._mongo_model(**{**query, **defaults})  # type: ignore
         await obj.save_async()
         return obj, created
 
@@ -1126,7 +1170,11 @@ class AsyncQueryBuilder(BaseQueryBuilder):
         sort: Optional[int] = None,
         **query,
     ) -> tuple:
-        count = await self.count(session=session, logical_query=logical_query, **query,)
+        count = await self.count(
+            session=session,
+            logical_query=logical_query,
+            **query,
+        )
         results = await self.find(
             skip_rows=skip_rows,
             limit_rows=limit_rows,

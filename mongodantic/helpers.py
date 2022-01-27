@@ -26,7 +26,7 @@ from .exceptions import MongoConnectionError, MongoValidationError
 from .types import ObjectIdStr
 
 if TYPE_CHECKING:
-    from .models import BaseModel
+    from .models import MongoModel
 
 __all__ = (
     'handle_and_convert_connection_errors',
@@ -59,14 +59,14 @@ class classproperty(classmethod):
         self.fget = method
 
     def __get__(self, instance, cls=None):
-        return self.fget(cls)
+        return self.fget(cls)  # type: ignore
 
     def getter(self, method):
         self.fget = method
         return self
 
 
-def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
+def _validate_value(cls: Type['MongoModel'], field_name: str, value: Any) -> Any:
     """extra helper value validation
 
     Args:
@@ -101,13 +101,13 @@ def _validate_value(cls: Type['BaseModel'], field_name: str, value: Any) -> Any:
 
 
 class ExtraQueryMapper(object):
-    """extra mapper for __ queries like find(_id__in=[], name__regex='123') """
+    """extra mapper for __ queries like find(_id__in=[], name__regex='123')"""
 
-    def __init__(self, model: Type['BaseModel'], field_name: str):
+    def __init__(self, model: Type['MongoModel'], field_name: str):
         self.field_name = field_name
         self.model = model
 
-    def extra_query(self, extra_methods: List, values) -> Dict:
+    def extra_query(self, extra_methods: List, values: Any) -> Dict:
         if self.field_name == '_id':
             values = (
                 [ObjectId(v) for v in values]
@@ -251,7 +251,7 @@ def bulk_query_generator(
     query_fields: Optional[List] = None,
     upsert=False,
 ) -> List:
-    """"helper for generate bulk query"""
+    """ "helper for generate bulk query"""
 
     data = []
     if updated_fields:

@@ -11,7 +11,9 @@ __all__ = ('QuerySet',)
 
 class QuerySet(object):
     def __init__(
-        self, model: 'MongoModel', data: Generator,
+        self,
+        model: 'MongoModel',
+        data: Generator,
     ):
         self._data = data
         self._model = model
