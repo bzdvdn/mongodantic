@@ -136,8 +136,8 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
             Dict: parsed query
         """
         data = {}
-        for field, value in query.items():
-            field, *extra_params = field.split("__")
+        for query_field, value in query.items():
+            field, *extra_params = query_field.split("__")
             inners, extra_params = cls._parse_extra_params(extra_params)
             if not cls.__validate_field(field):
                 continue
@@ -150,7 +150,14 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
                 value = _validate_value(cls, field, value) if not inners else value
             if inners:
                 field = f'{field}.{".".join(i for i in inners)}'
-            data[field] = value
+            if (
+                extra
+                and field in data
+                and ('__gt' in query_field or '__lt' in query_field)
+            ):
+                data[field].update(value)
+            else:
+                data[field] = value
         return data
 
     @classproperty
@@ -163,7 +170,7 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
     def _check_query_args(
         cls,
         logical_query: Union[
-            List[Any], Dict[Any, Any], str, Query, LogicalCombination
+            List[Any], Dict[Any, Any], str, Query, LogicalCombination, None
         ] = None,
     ) -> 'DictStrAny':
         """check if query = Query obj or LogicCombination
@@ -198,7 +205,7 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         include: Optional['AbstractSetIntStr'] = None,
         exclude: Optional['AbstractSetIntStr'] = None,
         by_alias: bool = False,
-        skip_defaults: bool = None,
+        skip_defaults: Optional[bool] = None,
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
@@ -209,10 +216,10 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
 
         """
         attribs = super().dict(
-            include=include,
-            exclude=exclude,
+            include=include,  # type: ignore
+            exclude=exclude,  # type: ignore
             by_alias=by_alias,
-            skip_defaults=skip_defaults,
+            skip_defaults=skip_defaults,  # type: ignore
             exclude_unset=exclude_unset,
             exclude_defaults=exclude_defaults,
             exclude_none=exclude_none,
