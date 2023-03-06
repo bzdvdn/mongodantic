@@ -290,7 +290,13 @@ class QueryBuilder(object):
         data = self.__query('insert_one', obj.query_data, session=session)
         return data.inserted_id
 
-    def insert_many(self, data: List, session: Optional[ClientSession] = None) -> int:
+    def insert_many(
+        self,
+        data: List,
+        session: Optional[ClientSession] = None,
+        _ordered: bool = True,
+        _bypass_document_validation: bool = False,
+    ) -> int:
         """insert many documents
 
         Args:
@@ -305,7 +311,13 @@ class QueryBuilder(object):
             parse_obj(obj).query_data if isinstance(obj, dict) else obj.query_data
             for obj in data
         ]
-        r = self.__query('insert_many', query, session=session)
+        r = self.__query(
+            'insert_many',
+            query,
+            session=session,
+            ordered=_ordered,
+            bypass_document_validation=_bypass_document_validation,
+        )
         return len(r.inserted_ids)
 
     def delete_one(
@@ -731,6 +743,8 @@ class QueryBuilder(object):
         models: List,
         batch_size: Optional[int] = 30000,
         session: Optional[ClientSession] = None,
+        _ordered: bool = True,
+        _bypass_document_validation: bool = False,
     ) -> int:
         """bulk create method
 
@@ -746,7 +760,12 @@ class QueryBuilder(object):
             batch_size = 30000
         result = 0
         for data in chunk_by_length(models, batch_size):
-            result += self.insert_many(data, session=session)
+            result += self.insert_many(
+                data,
+                session=session,
+                _ordered=_ordered,
+                _bypass_document_validation=_bypass_document_validation,
+            )
         return result
 
     def bulk_update_or_create(
