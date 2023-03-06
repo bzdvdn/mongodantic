@@ -170,7 +170,10 @@ class TestBasicOperation:
                 array=['test', 'adv'],
             ),
         ]
-        inserted = self.Ticket.Q.insert_many(data)
+        inserted = self.Ticket.Q.insert_many(
+            data,
+            _ordered=False,
+        )
         assert inserted == 2
 
     @pytest.mark.asyncio

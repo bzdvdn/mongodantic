@@ -13,7 +13,7 @@ class TestBasicOperation:
         connect("mongodb://127.0.0.1:27017", "test")
 
         class User(MongoModel):
-            id: UUID
+            id: str
             name: str
             email: str
 
@@ -26,10 +26,11 @@ class TestBasicOperation:
     def test_raw_insert_one(self):
         with pytest.raises(MongoValidationError):
             result = self.User.Q.raw_query(
-                'insert_one', {'id': uuid4(), 'name': {}, 'email': []}
+                'insert_one', {'id': str(uuid4()), 'name': {}, 'email': []}
             )
         result = self.User.Q.raw_query(
-            'insert_one', {'id': uuid4(), 'name': 'first', 'email': 'first@mail.ru'}
+            'insert_one',
+            {'id': str(uuid4()), 'name': 'first', 'email': 'first@mail.ru'},
         )
         assert isinstance(result.inserted_id, ObjectId)
 

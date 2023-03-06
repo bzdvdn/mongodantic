@@ -20,7 +20,7 @@ class TestIndexOperation:
                 if basic_indexes:
                     indexes = [IndexModel([('position', 1)]), IndexModel([('name', 1)])]
                 else:
-                    indexes = indexes = [IndexModel([('position', 1)])]
+                    indexes = [IndexModel([('position', 1)])]
 
         if drop:
             Ticket.querybuilder.drop_collection(force=True)
