@@ -7,8 +7,9 @@ from pymongo import MongoClient
 
 
 class TestWriteConnectionParams:
-    def setup(self):
-        connect("mongodb://127.0.0.1:27017", "test")
+    def setup_method(self):
+        connect("mongodb://127.0.0.1:27017", "test",
+                env_name=DEFAULT_CONNECTION_NAME)
         self.connection = _DBConnection(str(os.getpid()))
 
     def test_connection_params(self):
@@ -23,7 +24,6 @@ class TestWriteConnectionParams:
         assert isinstance(self.connection._mongo_connection, MongoClient)
 
     def test_conection_database(self):
-
         assert self.connection._mongo_connection.get_database('test') == MongoClient(
             "mongodb://127.0.0.1:27017"
         ).get_database("test")

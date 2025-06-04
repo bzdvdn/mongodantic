@@ -47,7 +47,7 @@ class QueryBuilder(object):
     def __query(
         self,
         method_name: str,
-        query_params: Union[List, Dict, str, Query, LogicalCombination],
+        query_params: Union[List, Dict, str, Query, LogicalCombination, None],
         set_values: Optional[Dict] = None,
         session: Optional[ClientSession] = None,
         logical: bool = False,
@@ -57,7 +57,7 @@ class QueryBuilder(object):
 
         Args:
             method_name (str): query method like find, find_one and other
-            query_params (Union[List, Dict, str, Query, LogicalCombination]): query params: dict or Query or LogicalCombination
+            query_params (Union[List, Dict, str, Query, LogicalCombination, None]): query params: dict or Query or LogicalCombination
             set_values (Optional[Dict], optional): for updated method. Defaults to None.
             session (Optional[ClientSession], optional): pymongo session. Defaults to None.
             logical (bool, optional): if logical. Defaults to False.
@@ -65,12 +65,19 @@ class QueryBuilder(object):
         Returns:
             Any: query result
         """
+        method = getattr(self._mongo_model._collection, method_name)
+
+        # Special cases that don't need query validation
+        if method_name in ('list_indexes', 'drop'):
+            if session:
+                kwargs['session'] = session
+            return method(**kwargs)
+
         if logical:
             query_params = self._mongo_model._check_query_args(query_params)
         elif isinstance(query_params, dict):
             query_params = self._mongo_model._validate_query_data(query_params)
 
-        method = getattr(self._mongo_model._collection, method_name)
         query: tuple = (query_params,)
         if session:
             kwargs['session'] = session
@@ -80,19 +87,12 @@ class QueryBuilder(object):
             return method(*query, **kwargs)
         return method(*query)
 
-    def check_indexes(self) -> dict:
-        """get indexes for this collection
-
-        Returns:
-            dict: indexes result
-        """
-        index_list = list(self.__query('list_indexes', {}))
-        return_data = {}
-        for index in index_list:
-            dict_index = dict(index)
-            data = {dict_index['name']: {'key': dict(dict_index['key'])}}
-            return_data.update(data)
-        return return_data
+    def check_indexes(self) -> None:
+        """Check indexes for model"""
+        try:
+            self._mongo_model.collection.list_indexes()
+        except Exception:
+            pass
 
     def create_indexes(
         self,
@@ -102,11 +102,23 @@ class QueryBuilder(object):
         return self.__query('create_indexes', indexes, session=session)
 
     def drop_index(self, index_name: str) -> str:
-        indexes = self.check_indexes()
-        if index_name in indexes:
+        """Drop an index by name
+
+        Args:
+            index_name (str): Name of the index to drop
+
+        Returns:
+            str: Success message
+
+        Raises:
+            MongoIndexError: If index name is invalid
+        """
+        try:
             self.__query('drop_index', index_name)
             return f'{index_name} dropped.'
-        raise MongoIndexError(f'invalid index name - {index_name}')
+        except Exception as e:
+            raise MongoIndexError(
+                f'invalid index name - {index_name}: {str(e)}')
 
     def count(
         self,
@@ -179,10 +191,11 @@ class QueryBuilder(object):
             logical_query or query,
             session=session,
             logical=bool(logical_query),
-            sort=[(field, sort or 1) for field in sort_fields] if sort_fields else None,
+            sort=[(field, sort or 1)
+                  for field in sort_fields] if sort_fields else None,
         )
         if data:
-            obj = self._mongo_model.parse_obj(data)
+            obj = self._mongo_model.model_validate(data)
             return obj
         return None
 
@@ -277,48 +290,24 @@ class QueryBuilder(object):
         )
         return count, results
 
-    def insert_one(self, session: Optional[ClientSession] = None, **query) -> ObjectId:
-        """insert one document
-
-        Args:
-            session (Optional[ClientSession], optional): Pymongo session. Defaults to None.
-
-        Returns:
-            ObjectId: created document _id
-        """
-        obj = self._mongo_model.parse_obj(query)
+    def insert_one(self, session: Optional[ClientSession] = None, **obj) -> ObjectId:
+        obj = self._mongo_model.model_validate(obj)
         data = self.__query('insert_one', obj.query_data, session=session)
         return data.inserted_id
 
     def insert_many(
         self,
-        data: List,
+        data: List[Union[Dict, 'MongoModel']],
         session: Optional[ClientSession] = None,
-        _ordered: bool = True,
-        _bypass_document_validation: bool = False,
+        **kwargs,
     ) -> int:
-        """insert many documents
-
-        Args:
-            data (List): List of dict or MongoModels
-            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
-
-        Returns:
-            int: count inserted ids
-        """
-        parse_obj = self._mongo_model.parse_obj
-        query = [
-            parse_obj(obj).query_data if isinstance(obj, dict) else obj.query_data
-            for obj in data
-        ]
-        r = self.__query(
-            'insert_many',
-            query,
-            session=session,
-            ordered=_ordered,
-            bypass_document_validation=_bypass_document_validation,
-        )
-        return len(r.inserted_ids)
+        objects = []
+        for obj in data:
+            if isinstance(obj, dict):
+                obj = self._mongo_model.model_validate(obj)
+            objects.append(obj.query_data)
+        data = self.__query('insert_many', objects, session=session)
+        return len(data.inserted_ids)
 
     def delete_one(
         self,
@@ -444,18 +433,27 @@ class QueryBuilder(object):
             or 'replace' in method_name
             or 'update' in method_name
         ):
-            if isinstance(raw_query, list):
-                raw_query = list(map(self._mongo_model._validate_query_data, raw_query))
-            elif isinstance(raw_query, dict):
-                raw_query = self._mongo_model._validate_query_data(raw_query)
-            else:
-                params = [
-                    query[key] if '$' in key else query
-                    for query in raw_query
-                    for key in query.keys()
-                ]
-                map(self._mongo_model._validate_query_data, params)
-        parsed_query = raw_query if isinstance(raw_query, tuple) else (raw_query,)
+            try:
+                if isinstance(raw_query, list):
+                    raw_query = list(
+                        map(self._mongo_model._validate_query_data, raw_query))
+                elif isinstance(raw_query, dict):
+                    raw_query = self._mongo_model._validate_query_data(
+                        raw_query)
+                else:
+                    params = [
+                        query[key] if '$' in key else query
+                        for query in raw_query
+                        for key in query.keys()
+                    ]
+                    map(self._mongo_model._validate_query_data, params)
+            except Exception as e:
+                # Convert any validation error to MongoValidationError
+                if isinstance(e, MongoValidationError):
+                    raise
+                raise MongoValidationError(str(e))
+        parsed_query = raw_query if isinstance(
+            raw_query, tuple) else (raw_query,)
         return parsed_query
 
     def get_or_create(self, **query) -> Tuple:
@@ -511,12 +509,24 @@ class QueryBuilder(object):
         Returns:
             Any: pymongo query result
         """
-        parsed_query = self.__validate_raw_query(method_name, raw_query)
         try:
+            # Validate the data before executing the query
+            if 'insert' in method_name:
+                if isinstance(raw_query, dict):
+                    self._mongo_model.model_validate(raw_query)
+                elif isinstance(raw_query, list):
+                    for item in raw_query:
+                        self._mongo_model.model_validate(item)
+
+            parsed_query = self.__validate_raw_query(method_name, raw_query)
             query = getattr(self._mongo_model._collection, method_name)
             return query(*parsed_query, session=session)
         except AttributeError:
             raise MongoValidationError('invalid method name')
+        except Exception as e:
+            if isinstance(e, MongoValidationError):
+                raise
+            raise MongoValidationError(str(e))
 
     def _update(
         self,
@@ -824,7 +834,8 @@ class QueryBuilder(object):
         return_document = ReturnDocument.AFTER
         replacement = query.pop('replacement', None)
 
-        projection = {f: True for f in projection_fields} if projection_fields else None
+        projection = {
+            f: True for f in projection_fields} if projection_fields else None
         extra_params = {
             'return_document': return_document,
             'projection': projection,
@@ -832,51 +843,48 @@ class QueryBuilder(object):
             'session': session,
         }
         if sort_fields:
-            extra_params['sort'] = [(field, sort or 1) for field in sort_fields]
+            extra_params['sort'] = [(field, sort or 1)
+                                    for field in sort_fields]
 
         if replacement:
             extra_params['replacement'] = replacement
 
-        data = self.__query(operation, filter_, {'$set': set_values}, **extra_params)
+        data = self.__query(operation, filter_, {
+                            '$set': set_values}, **extra_params)
         if projection:
             return {
-                field: value for field, value in data.items() if field in projection
+                field: value for field, value in data.items() if field in projection.keys()
             }
-        return self._mongo_model.parse_obj(data)
+        return self._mongo_model.model_validate(data)
 
     def find_one_and_update(
         self,
-        projection_fields: Optional[list] = None,
-        sort_fields: Optional[Union[Tuple, List]] = None,
-        sort: Optional[int] = None,
-        upsert: bool = False,
         session: Optional[ClientSession] = None,
+        projection_fields: Optional[List] = None,
         **query,
-    ):
-        """find one and update
-
-        Args:
-            operation (str): operation name
-            projection_fields (Optional[list], optional): prejection. Defaults to None.
-            sort_fields (Optional[Union[Tuple, List]], optional): sort fields. Defaults to None.
-            sort (Optional[int], optional): -1 or 1. Defaults to None.
-            upsert (bool, optional): True/False. Defaults to False.
-            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
-
-        Returns:
-            Union[Dict, 'MongoModel']: MongoModel or Dict
-        """
-        return self._find_with_replacement_or_with_update(
+    ) -> Optional[Union['MongoModel', Dict]]:
+        filter_, set_values = self._prepare_update_data(**query)
+        if projection_fields:
+            projection = {field: 1 for field in projection_fields}
+            data = self.__query(
+                'find_one_and_update',
+                filter_,
+                {'$set': set_values},
+                session=session,
+                projection=projection,
+                return_document=ReturnDocument.AFTER,
+            )
+            return data
+        data = self.__query(
             'find_one_and_update',
-            projection_fields=projection_fields,
-            sort_fields=[(field, sort or 1) for field in sort_fields]
-            if sort_fields
-            else None,
-            sort=sort,
-            upsert=upsert,
+            filter_,
+            {'$set': set_values},
             session=session,
-            **query,
+            return_document=ReturnDocument.AFTER,
         )
+        if data:
+            return self._mongo_model.model_validate(data)
+        return None
 
     def find_and_replace(
         self,
@@ -916,24 +924,26 @@ class QueryBuilder(object):
             **query,
         )
 
-    def drop_collection(self, force: bool = False) -> str:
+    def drop_collection(self, force: bool = False, session: Optional[ClientSession] = None) -> str:
         """drop collection
 
         Args:
             force (bool, optional): if u wanna force drop. Defaults to False.
+            session (Optional[ClientSession], optional): pymongo session. Defaults to None.
 
         Returns:
             str: result message
         """
         drop_message = f'{self._mongo_model.__name__.lower()} - dropped!'  # type: ignore
         if force:
-            self.__query('drop', query_params={})
+            self.__query('drop', query_params=None, session=session)
             return drop_message
         value = input(
-            f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'  # type: ignore
+            # type: ignore
+            f'Are u sure for drop this collection - {self._mongo_model.__name__.lower()} (y, n)'
         )
         if value.lower() == 'y':
-            self.__query('drop', query_params={})
+            self.__query('drop', query_params=None, session=session)
             return drop_message
         return 'nope'
 
@@ -941,7 +951,7 @@ class QueryBuilder(object):
 class AsyncQueryBuilder(QueryBuilder):
     @sync_to_async
     def __query(self, *args, **kwargs):
-        return super().__query(*args, **kwargs)
+        return QueryBuilder._QueryBuilder__query(self, *args, **kwargs)
 
     @sync_to_async
     def insert_one(self, *args, **kwargs):
@@ -1030,7 +1040,8 @@ class AsyncQueryBuilder(QueryBuilder):
         session: Optional[ClientSession] = None,
         **query,
     ) -> int:
-        return await self.count(logical_query, session, **query)  # type: ignore
+        # type: ignore
+        return await self.count(logical_query, session, **query)
 
     @no_type_check
     async def get_or_create(self, **query) -> Tuple:
@@ -1079,7 +1090,8 @@ class AsyncQueryBuilder(QueryBuilder):
             batch_size = 30000
         result = 0
         for data in chunk_by_length(models, batch_size):
-            result += await self.insert_many(data, session=session)  # type: ignore
+            # type: ignore
+            result += await self.insert_many(data, session=session)
         return result
 
     @no_type_check
@@ -1204,3 +1216,33 @@ class AsyncQueryBuilder(QueryBuilder):
             **query,
         )
         return count, results
+
+    @no_type_check
+    async def find_one_and_update(
+        self,
+        session: Optional[ClientSession] = None,
+        projection_fields: Optional[List] = None,
+        **query,
+    ) -> Optional[Union['MongoModel', Dict]]:
+        filter_, set_values = self._prepare_update_data(**query)
+        if projection_fields:
+            projection = {field: 1 for field in projection_fields}
+            data = await self.__query(
+                'find_one_and_update',
+                filter_,
+                {'$set': set_values},
+                session=session,
+                projection=projection,
+                return_document=ReturnDocument.AFTER,
+            )
+            return data
+        data = await self.__query(
+            'find_one_and_update',
+            filter_,
+            {'$set': set_values},
+            session=session,
+            return_document=ReturnDocument.AFTER,
+        )
+        if data:
+            return self._mongo_model.model_validate(data)
+        return None

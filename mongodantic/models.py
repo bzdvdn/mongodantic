@@ -1,11 +1,10 @@
 import os
 import json
 from logging import getLogger
-from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING
+from typing import Dict, Any, Union, Optional, List, Tuple, Set, TYPE_CHECKING, ClassVar
 from pymongo.client_session import ClientSession
 from bson import ObjectId
-from pydantic.main import ModelMetaclass as PydanticModelMetaclass
-from pydantic import BaseModel as BasePydanticModel
+from pydantic import BaseModel, ConfigDict
 from pymongo.collection import Collection
 from pymongo import IndexModel, database
 
@@ -36,39 +35,27 @@ logger = getLogger('mongodantic')
 _is_mongo_model_class_defined = False
 
 
-class ModelMetaclass(PydanticModelMetaclass):
-    def __new__(mcs, name, bases, namespace, **kwargs):  # type: ignore
-        cls = super().__new__(mcs, name, bases, namespace, **kwargs)
-        indexes = set()
-        if _is_mongo_model_class_defined and issubclass(cls, MongoModel):
-            querybuilder = getattr(cls, '__querybuilder__')
-            async_querybuilder = getattr(cls, '__async_querybuilder__')
-            if querybuilder is None:
-                querybuilder = QueryBuilder(cls)  # type: ignore
-                setattr(cls, '__querybuilder__', querybuilder)
-            if async_querybuilder is None:
-                async_querybuilder = AsyncQueryBuilder(cls)  # type: ignore
-                setattr(cls, '__async_querybuilder__', async_querybuilder)
-            # setattr(cls, 'querybuilder', querybuilder)
-        json_encoders = getattr(cls.Config, 'json_encoders', {})  # type: ignore
-        json_encoders.update({ObjectId: lambda f: str(f)})
-        setattr(cls.Config, 'json_encoders', json_encoders)  # type: ignore
-        exclude_fields = getattr(cls.Config, 'exclude_fields', tuple())  # type: ignore
-        setattr(cls, '__indexes__', indexes)
-        setattr(cls, '__mongo_exclude_fields__', exclude_fields)
-        return cls
+class MongoModel(BaseModel):
+    model_config = ConfigDict(
+        arbitrary_types_allowed=True,
+        json_encoders={ObjectId: lambda f: str(f)},
+        validate_assignment=True
+    )
 
-
-class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
-    __indexes__: Set['str'] = set()
-    __mongo_exclude_fields__: Union[Tuple, List] = tuple()
-    __connection__: Optional[_DBConnection] = None
-    __querybuilder__: Optional[QueryBuilder] = None
-    __async_querybuilder__: Optional[AsyncQueryBuilder] = None
+    __indexes__: ClassVar[Set[str]] = set()
+    __mongo_exclude_fields__: ClassVar[Union[Tuple, List]] = tuple()
+    __connection__: ClassVar[Optional[_DBConnection]] = None
+    __querybuilder__: ClassVar[Optional[QueryBuilder]] = None
+    __async_querybuilder__: ClassVar[Optional[AsyncQueryBuilder]] = None
     _id: Optional[ObjectIdStr] = None
 
+    def __init__(self, **data):
+        super().__init__(**data)
+        if not hasattr(self.__class__, '__querybuilder__'):
+            self.__class__.__querybuilder__ = QueryBuilder(self.__class__)
+
     def __setattr__(self, key, value):
-        if key in self.__fields__:
+        if key in type(self).model_fields:
             return super().__setattr__(key, value)
         self.__dict__[key] = value
         return value
@@ -94,23 +81,30 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
                 "query_data",
                 "fields_all",
                 "all_fields",
+                "model_fields_set",
             )
             and isinstance(getattr(cls, prop), property)
         ]
 
     @classmethod
-    def parse_obj(cls, data: Any) -> Any:
-        obj = super().parse_obj(data)
+    def model_validate(cls, data: Any) -> Any:
+        obj = super().model_validate(data)
         if '_id' in data:
             obj._id = data['_id']
-        # print(reference_fields)
         return obj
 
     @classmethod
     def __validate_field(cls, field: str) -> bool:
-        if field not in cls.__fields__ and field != '_id':
-            raise NotDeclaredField(field, list(cls.__fields__.keys()))
-        elif field in cls.__mongo_exclude_fields__:
+        if not field:  # Handle empty field names
+            return True
+        # Skip Pydantic internal fields
+        if field.startswith('model_'):
+            return True
+        # Handle special suffixes like __set, __in, etc.
+        base_field = field.split('__')[0]
+        if base_field not in cls.model_fields and base_field != '_id':
+            raise NotDeclaredField(base_field, list(cls.model_fields.keys()))
+        elif base_field in cls.__mongo_exclude_fields__:
             return False
         return True
 
@@ -126,43 +120,37 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         return field_param, extra
 
     @classmethod
-    def _validate_query_data(cls, query: Dict) -> 'DictStrAny':
-        """main validation method
+    def _validate_query_data(cls, query_params: Dict) -> Dict:
+        """Validate query data
 
         Args:
-            query (Dict): basic query
+            query_params: query parameters
 
         Returns:
-            Dict: parsed query
+            Dict: validated query parameters
         """
-        data = {}
-        for query_field, value in query.items():
-            field, *extra_params = query_field.split("__")
-            inners, extra_params = cls._parse_extra_params(extra_params)
-            if not cls.__validate_field(field):
+        validated_query = {}
+        for field_name, value in query_params.items():
+            # Skip validation for MongoDB operators
+            if field_name.startswith('$') or (isinstance(value, dict) and any(k.startswith('$') for k in value)):
+                validated_query[field_name] = value
                 continue
-            extra = ExtraQueryMapper(cls, field).extra_query(extra_params, value)
-            if extra:
-                value = extra[field]
-            elif field == '_id':
-                value = ObjectId(value)
+
+            if '__' in field_name:
+                base_field, *extra_params = field_name.split('__')
+                if base_field not in cls.model_fields:
+                    continue
+                validated_query.update(
+                    ExtraQueryMapper(
+                        cls, base_field).extra_query(extra_params, value))
             else:
-                value = _validate_value(cls, field, value) if not inners else value
-            if inners:
-                field = f'{field}.{".".join(i for i in inners)}'
-            if (
-                extra
-                and field in data
-                and ('__gt' in query_field or '__lt' in query_field)
-            ):
-                data[field].update(value)
-            else:
-                data[field] = value
-        return data
+                validated_query[field_name] = _validate_value(
+                    cls, field_name, value)
+        return validated_query
 
     @classproperty
     def fields_all(cls) -> list:
-        fields = list(cls.__fields__.keys())
+        fields = list(cls.model_fields.keys())
         return_fields = fields + cls._get_properties()
         return return_fields
 
@@ -196,65 +184,78 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
     @classmethod
     def sort_fields(cls, fields: Union[Tuple, List, None]) -> None:
         if fields:
-            new_sort = {field: cls.__fields__[field] for field in fields}
-            cls.__fields__ = new_sort
+            new_sort = {field: cls.model_fields[field] for field in fields}
+            cls.model_fields = new_sort
 
-    def dict(  # type: ignore
+    def model_dump(
         self,
         *,
         include: Optional['AbstractSetIntStr'] = None,
         exclude: Optional['AbstractSetIntStr'] = None,
         by_alias: bool = False,
-        skip_defaults: Optional[bool] = None,
         exclude_unset: bool = False,
         exclude_defaults: bool = False,
         exclude_none: bool = False,
         with_props: bool = True,
     ) -> 'DictStrAny':
-        """
-        Generate a dictionary representation of the model, optionally specifying which fields to include or exclude.
+        # Add internal Pydantic fields to exclude
+        exclude = set(exclude or set())
+        exclude.update({
+            'model_fields_set',
+            'model_extra',
+            'model_fields',
+            'model_config',
+            'model_post_init',
+            'model_validate',
+            'model_validate_json',
+            'model_dump',
+            'model_dump_json',
+            'model_copy',
+            'model_construct',
+            'model_parse_obj',
+            'model_parse_raw',
+            'model_validate_json_file',
+            'model_validate_json_str',
+            'model_validate_json_bytes'
+        })
 
-        """
-        attribs = super().dict(
-            include=include,  # type: ignore
-            exclude=exclude,  # type: ignore
+        data = super().model_dump(
+            include=include,
+            exclude=exclude,
             by_alias=by_alias,
-            skip_defaults=skip_defaults,  # type: ignore
             exclude_unset=exclude_unset,
             exclude_defaults=exclude_defaults,
             exclude_none=exclude_none,
         )
+
+        # Convert any sets to lists for MongoDB compatibility
+        for key, value in data.items():
+            if isinstance(value, set):
+                data[key] = list(value)
+
         if with_props:
-            props = self._get_properties()
-            # Include and exclude properties
-            if include:
-                props = [prop for prop in props if prop in include]
-            if exclude:
-                props = [prop for prop in props if prop not in exclude]
+            for prop in self._get_properties():
+                value = getattr(self, prop)
+                if isinstance(value, set):
+                    value = list(value)
+                data[prop] = value
 
-            # Update the attribute dict with the properties
-            if props:
-                attribs.update({prop: getattr(self, prop) for prop in props})
-
-        return attribs
+        return data
 
     def _data(self, with_props: bool = True) -> 'DictStrAny':
-        data = self.dict(with_props=with_props)
-        if '_id' in data:
-            data['_id'] = data['_id'].__str__()
-        return data
+        return self.model_dump(with_props=with_props)
 
     @property
     def data(self) -> 'DictStrAny':
-        return self._data(with_props=True)
+        return self._data()
 
     @property
     def query_data(self) -> 'DictStrAny':
-        return self._data(with_props=False)
+        return self._data()
 
     @classmethod
     def _get_connection(cls) -> _DBConnection:
-        return _get_connection(alias=str(os.getpid()), env_name=get_connection_env())
+        return _get_connection(str(os.getpid()))
 
     @classproperty
     def _connection(cls) -> Optional[_DBConnection]:
@@ -315,29 +316,57 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
     @classmethod
     def execute_indexes(cls):
         """method for create/update/delete indexes if indexes declared in Config property"""
-
-        indexes = getattr(cls.__config__, 'indexes', [])
+        indexes = getattr(cls.model_config, 'indexes', [])
         if not all([isinstance(index, IndexModel) for index in indexes]):
             raise ValueError('indexes must be list of IndexModel instances')
         if indexes:
             db_indexes = cls.Q.check_indexes()
-            indexes_to_create = [
-                i for i in indexes if i.document['name'] not in db_indexes
-            ]
+            # Get index names from the index models
+            index_names = []
+            for index in indexes:
+                # Get the first field name and direction from the index model
+                key = dict(index.document['key'])
+                field_name = list(key.keys())[0]
+                direction = key[field_name]
+                index_names.append(f"{field_name}_{direction}")
+
+            # Create indexes that don't exist
+            indexes_to_create = []
+            for index in indexes:
+                key = dict(index.document['key'])
+                if not any(db_indexes.get(name, {}).get('key') == key for name in db_indexes):
+                    indexes_to_create.append(index)
+
+            # Delete indexes that are not in the model config
             indexes_to_delete = [
-                i
-                for i in db_indexes
-                if i not in [i.document['name'] for i in indexes] and i != '_id_'
+                name for name in db_indexes
+                if name not in index_names and name != '_id_'
             ]
-            result = []
+
+            # Create new indexes
             if indexes_to_create:
-                result = cls.Q.create_indexes(indexes_to_create)
+                try:
+                    cls.Q.create_indexes(indexes_to_create)
+                except Exception as e:
+                    print(f"Error creating indexes: {str(e)}")
+                    raise
+
+            # Delete old indexes
             if indexes_to_delete:
                 for index_name in indexes_to_delete:
-                    cls.Q.drop_index(index_name)
-                db_indexes = cls.Q.check_indexes()
-            indexes = set(list(db_indexes.keys()) + result)
-        setattr(cls, '__indexes__', indexes)
+                    try:
+                        cls.Q.drop_index(index_name)
+                    except Exception as e:
+                        print(f"Error dropping index {index_name}: {str(e)}")
+                        raise
+
+            # Update the class's __indexes__ attribute
+            cls.__indexes__ = set(index_names)
+
+            # Verify indexes were created
+            final_indexes = cls.Q.check_indexes()
+            if not final_indexes:
+                raise Exception("Failed to create indexes")
 
     def save(
         self,
@@ -347,10 +376,11 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
             if updated_fields:
-                if not all(field in self.__fields__ for field in updated_fields):
-                    raise MongoValidationError('invalid field in updated_fields')
+                if not all(field in type(self).model_fields for field in updated_fields):
+                    raise MongoValidationError(
+                        'invalid field in updated_fields')
             else:
-                updated_fields = tuple(self.__fields__.keys())
+                updated_fields = tuple(type(self).model_fields.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
             self.Q.update_one(
@@ -361,7 +391,7 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         data = {
             field: value
             for field, value in self.__dict__.items()
-            if field in self.__fields__
+            if field in type(self).model_fields
         }
         object_id = self.Q.insert_one(
             session=session,
@@ -390,10 +420,11 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         if self._id is not None:
             data = {'_id': ObjectId(self._id)}
             if updated_fields:
-                if not all(field in self.__fields__ for field in updated_fields):
-                    raise MongoValidationError('invalid field in updated_fields')
+                if not all(field in type(self).model_fields for field in updated_fields):
+                    raise MongoValidationError(
+                        'invalid field in updated_fields')
             else:
-                updated_fields = tuple(self.__fields__.keys())
+                updated_fields = tuple(type(self).model_fields.keys())
             for field in updated_fields:
                 data[f'{field}__set'] = getattr(self, field)
             await self.AQ.update_one(
@@ -404,7 +435,7 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
         data = {
             field: value
             for field, value in self.__dict__.items()
-            if field in self.__fields__
+            if field in type(self).model_fields
         }
         object_id = await self.AQ.insert_one(
             session=session,
@@ -415,11 +446,12 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
 
     def __hash__(self):
         if self.pk is None:
-            raise TypeError("MongoModel instances without _id value are unhashable")
+            raise TypeError(
+                "MongoModel instances without _id value are unhashable")
         return hash(self.pk)
 
     def serialize(self, fields: Union[Tuple, List]) -> 'DictStrAny':
-        data: dict = self.dict(include=set(fields))
+        data: dict = self.model_dump(include=set(fields))
         return {f: data[f] for f in fields}
 
     def serialize_json(self, fields: Union[Tuple, List]) -> str:
@@ -428,6 +460,17 @@ class MongoModel(BasePydanticModel, metaclass=ModelMetaclass):
     @property
     def pk(self):
         return self._id
+
+    def __getattr__(self, prop):
+        if prop == '__fields_set__':
+            return self.model_fields_set
+        if prop == '_id':
+            return None
+        try:
+            return object.__getattribute__(self, prop)
+        except AttributeError:
+            raise AttributeError(
+                f"'{self.__class__.__name__}' object has no attribute '{prop}'")
 
 
 _is_mongo_model_class_defined = True

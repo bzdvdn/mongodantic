@@ -1,5 +1,5 @@
 from abc import ABC
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Type
 
 from .exceptions import MongoValidationError
 
@@ -24,14 +24,26 @@ class BasicDefaultAggregation(ABC):
             raise NotImplementedError('implement _operation')
         return self._operation
 
-    def _validate_field(self, mongo_model: 'MongoModel'):
-        if self.field not in mongo_model.__fields__ and self.field != '_id':
+    def validate(self, mongo_model: Type['MongoModel']) -> None:
+        """Validate field name
+
+        Args:
+            mongo_model (Type[MongoModel]): mongo model class
+
+        Raises:
+            MongoValidationError: if invalid field
+        """
+        # Get the actual model class if we received an instance
+        model_class = mongo_model if isinstance(
+            mongo_model, type) else mongo_model.__class__
+
+        if self.field not in model_class.model_fields and self.field != '_id':
             raise MongoValidationError(
-                f'invalid field "{self.field}" for this model, field must be one of {list(mongo_model.__fields__.keys())}'
+                f'invalid field "{self.field}" for this model, field must be one of {list(model_class.model_fields.keys())}'
             )
 
     def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:
-        self._validate_field(mongo_model)
+        self.validate(mongo_model)  # Pass the model instance directly
         query = {
             f'{self.field}__{self.operation}': {f'${self.operation}': f'${self.field}'}
         }
@@ -58,7 +70,7 @@ class Count(BasicDefaultAggregation):
     _operation: Any = 'count'
 
     def _aggregate_query(self, mongo_model: 'MongoModel') -> dict:
-        self._validate_field(mongo_model)
+        self.validate(mongo_model)
         query = {
             "_id": f'${self.field}' if self.field != '_id' else None,
             f'count': {f'$sum': 1},
