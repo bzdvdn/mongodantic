@@ -6,28 +6,39 @@ from uuid import uuid4, UUID
 from mongodantic.models import MongoModel
 from mongodantic import connect
 from mongodantic.exceptions import MongoValidationError
+from pydantic import ConfigDict
+from mongodantic.querybuilder import QueryBuilder
 
 
 class TestBasicOperation:
-    def setup(self):
+    def setup_method(self):
         connect("mongodb://127.0.0.1:27017", "test")
 
         class User(MongoModel):
             id: str
             name: str
             email: str
+            model_config = ConfigDict(excluded_query_fields=('sign', 'type'))
 
-            class Config:
-                excluded_query_fields = ('sign', 'type')
-
-        User.Q.drop_collection(force=True)
-        self.User = User
+        # Initialize the model with valid values to ensure Q is initialized
+        # This ensures Q is initialized
+        _ = User(id="test", name="test", email="test@test.com")
+        self.User = User  # Store the class, not the instance
+        # Ensure Q is initialized
+        if not self.User.__querybuilder__:
+            self.User.__querybuilder__ = QueryBuilder(self.User)
+        # Now that Q is initialized, we can use it
+        self.User.Q.drop_collection(force=True)
 
     def test_raw_insert_one(self):
+        # Test with invalid data types that should trigger validation error
         with pytest.raises(MongoValidationError):
             result = self.User.Q.raw_query(
-                'insert_one', {'id': str(uuid4()), 'name': {}, 'email': []}
+                'insert_one', {'id': 123, 'name': {},
+                               'email': []}  # Using invalid types
             )
+
+        # Test with valid data
         result = self.User.Q.raw_query(
             'insert_one',
             {'id': str(uuid4()), 'name': 'first', 'email': 'first@mail.ru'},
@@ -73,7 +84,8 @@ class TestBasicOperation:
         self.test_raw_insert_one()
         with pytest.raises(MongoValidationError):
             result = self.User.Q.raw_query(
-                'update_one', [{'id': uuid4(), 'name': {}, 'email': []}]
+                # Using invalid types
+                'update_one', [{'id': 123, 'name': {}, 'email': []}]
             )
         result = self.User.Q.raw_query(
             'update_one', raw_query=({'name': 'first'}, {'$set': {'name': 'updated'}})

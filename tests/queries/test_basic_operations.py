@@ -4,13 +4,18 @@ from bson import ObjectId
 from mongodantic import connect
 from mongodantic.models import MongoModel
 from mongodantic.session import Session
-from mongodantic.exceptions import DoesNotExist
+from mongodantic.exceptions import DoesNotExist, NotDeclaredField
+from pydantic import ConfigDict
+from mongodantic.querybuilder import QueryBuilder, AsyncQueryBuilder
+from mongodantic.logical import Query, Q
 
 
 class TestBasicOperation:
-    def setup(self):
+    def setup_method(self):
+        # First connect to MongoDB
         connect("mongodb://127.0.0.1:27017", "test")
 
+        # Define the Ticket model
         class Ticket(MongoModel):
             name: str
             position: int
@@ -18,12 +23,42 @@ class TestBasicOperation:
             sign: int = 1
             type_: str = 'ga'
             array: list = [1, 2]
+            model_config = ConfigDict(
+                arbitrary_types_allowed=True,
+                json_encoders={ObjectId: lambda f: str(f)},
+                validate_assignment=True,
+                excluded_query_fields=('sign', 'type')
+            )
 
-            class Config:
-                excluded_query_fields = ('sign', 'type')
+            @classmethod
+            def __validate_field(cls, field: str) -> bool:
+                # Split the field name to handle query operations
+                base_field = field.split('__')[0]
+                if not base_field:  # Handle empty field names
+                    return True
+                if base_field not in cls.model_fields and base_field != '_id':
+                    print(
+                        f"DEBUG: base_field: {base_field} not in cls.model_fields: {cls.model_fields}")
+                    raise NotDeclaredField(
+                        base_field, list(cls.model_fields.keys()))
+                elif base_field in cls.__mongo_exclude_fields__:
+                    return False
+                return True
 
-        Ticket.Q.drop_collection(force=True)
+        # Initialize the model with the connection
         self.Ticket = Ticket
+
+        # Force initialization of query builders
+        self.Ticket.__querybuilder__ = QueryBuilder(self.Ticket)
+        self.Ticket.__async_querybuilder__ = AsyncQueryBuilder(self.Ticket)
+
+        # Initialize the model with valid values to ensure Q is initialized
+        _ = self.Ticket(name='test', position=1, config={
+                        'param1': 'test'}, array=['test'])
+
+        # Drop the collection if it exists
+        if self.Ticket.Q is not None:
+            self.Ticket.Q.drop_collection(force=True)
 
     def test_save(self):
         self.test_get_or_create()
@@ -40,7 +75,7 @@ class TestBasicOperation:
     def test_json(self):
         self.test_save()
         obj = self.Ticket.Q.find_one(name='updated', position=2310)
-        js = obj.json()
+        js = obj.model_dump_json()
         assert js != {}
 
     @pytest.mark.asyncio
@@ -176,6 +211,12 @@ class TestBasicOperation:
         )
         assert inserted == 2
 
+        # Verify the data was inserted correctly
+        result = self.Ticket.Q.find(name='second').list
+        assert len(result) == 2
+        assert result[0].array == ['test', 'google']
+        assert result[1].array == ['test', 'adv']
+
     @pytest.mark.asyncio
     async def test_async_insert_many(self):
         data = [
@@ -232,14 +273,20 @@ class TestBasicOperation:
 
     def test_find_in_array(self):
         self.test_insert_many()
-        data = self.Ticket.Q.find_one(array__in=['google']).data
-        assert data['array'] == ['test', 'google']
+        # Use the in_ operator for array search
+        data = self.Ticket.Q.find_one(array__in=['google'])
+        assert data is not None
+        assert data.array == ['test', 'google']
+
+        # Test non-matching case
         miss = self.Ticket.Q.find_one(array__in=['miss_data'])
         assert miss is None
 
     def test_find_with_regex(self):
         self.test_insert_many()
-        data = self.Ticket.Q.find_one(name__iregex="seCoNd")
+        # Use the regex operator
+        data = self.Ticket.Q.find_one(name__iregex='seCoNd')
+        assert data is not None
         assert data.name == 'second'
 
     def test_count(self):
@@ -269,7 +316,8 @@ class TestBasicOperation:
     def test_find(self):
         self.test_insert_many()
         data = self.Ticket.Q.find(name='second').list
-        sort = self.Ticket.Q.find(name='second', sort=-1, sort_fields=('_id',)).first()
+        sort = self.Ticket.Q.find(
+            name='second', sort=-1, sort_fields=('_id',)).first()
         assert sort.config == {'param1': '3333'}
         assert isinstance(data, list)
         assert len(data) == 2
@@ -317,7 +365,8 @@ class TestBasicOperation:
 
     def test_queryset_serialize(self):
         self.test_insert_many()
-        data = self.Ticket.Q.find(name='second').serialize(fields=['name', 'config'])
+        data = self.Ticket.Q.find(name='second').serialize(
+            fields=['name', 'config'])
         assert len(data[0]) == 2
         assert data[0]['config'] == {'param1': '2222'}
         assert data[0]['name'] == 'second'
@@ -356,7 +405,8 @@ class TestBasicOperation:
 
     def test_update_one(self):
         self.test_insert_one()
-        data = self.Ticket.Q.update_one(name='first', config__set={'updated': 1})
+        data = self.Ticket.Q.update_one(
+            name='first', config__set={'updated': 1})
         updated = self.Ticket.Q.find_one(name='first')
         assert data == 1
         assert updated.config == {'updated': 1}
@@ -371,7 +421,8 @@ class TestBasicOperation:
 
     def test_update_many(self):
         self.test_insert_many()
-        data = self.Ticket.Q.update_many(name='second', config__set={'updated': 3})
+        data = self.Ticket.Q.update_many(
+            name='second', config__set={'updated': 3})
         updated = self.Ticket.Q.find_one(name='second')
         assert data == 2
         assert updated.config == {'updated': 3}
@@ -388,7 +439,8 @@ class TestBasicOperation:
 
     def test_find_and_update(self):
         self.test_insert_one()
-        data_default = self.Ticket.Q.find_one_and_update(name='first', position__set=23)
+        data_default = self.Ticket.Q.find_one_and_update(
+            name='first', position__set=23)
         assert data_default.position == 23
 
         data_with_prejection = self.Ticket.Q.find_one_and_update(

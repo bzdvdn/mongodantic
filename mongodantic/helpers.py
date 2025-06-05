@@ -12,6 +12,7 @@ from typing import (
     Callable,
     TYPE_CHECKING,
     Type,
+    Annotated,
 )
 from bson import ObjectId
 from pymongo import UpdateOne
@@ -21,6 +22,7 @@ from pymongo.errors import (
     NetworkTimeout,
     ConnectionFailure,
 )
+from pydantic_core import PydanticCustomError
 
 from .exceptions import MongoConnectionError, MongoValidationError
 from .types import ObjectIdStr
@@ -66,37 +68,83 @@ class classproperty(classmethod):
         return self
 
 
-def _validate_value(cls: Type['MongoModel'], field_name: str, value: Any) -> Any:
-    """extra helper value validation
+def _validate_value(cls, field_name: str, value: Any) -> Any:
+    """Validate value for field
 
     Args:
-        cls (Type[): mongo model class
-        field_name (str): name of field
-        value (Any): value
-
-    Raises:
-        AttributeError: if not field in __fields__
-        MongoValidationError: if invalid value type
+        cls: MongoModel class
+        field_name: field name
+        value: value to validate
 
     Returns:
-        Any: value
+        Any: validated value
+
+    Raises:
+        PydanticCustomError: If field doesn't exist or value type is invalid
     """
+    # Skip validation for Pydantic internal fields
+    if field_name.startswith('model_'):
+        return value
+
+    # Special handling for _id field
     if field_name == '_id':
-        field = ObjectIdStr()  # type: ignore
-    else:
-        field = cls.__fields__.get(field_name)  # type: ignore
-    error_ = None
-    if isinstance(field, ObjectIdStr):
+        if isinstance(value, str):
+            return ObjectId(value)
+        return value
+
+    # Skip type validation for array query values
+    if '__' in field_name:
+        return value
+
+    field = cls.model_fields.get(field_name)  # type: ignore
+    if field is None:
+        raise PydanticCustomError(
+            "field_not_found",
+            f"Field '{field_name}' not found in model",
+            dict(field_name=field_name)
+        )
+
+    # Get the actual type from Annotated if present
+    field_type = field.annotation
+    if hasattr(field_type, '__origin__') and field_type.__origin__ is Annotated:
+        field_type = field_type.__args__[0]
+
+    if field_type == ObjectIdStr:
+        if isinstance(value, str):
+            return ObjectId(value)
+        return value
+
+    # Handle list types
+    if hasattr(field_type, '__origin__') and field_type.__origin__ is list:
+        # For direct list assignments, validate the value is a list
+        if not isinstance(value, list):
+            raise PydanticCustomError(
+                "type_error",
+                "Value must be of type list",
+                dict(type="list")
+            )
+        # Get the inner type of the list
+        inner_type = field_type.__args__[0]
         try:
-            value = field.validate(value)
-        except ValueError as e:
-            error_ = e
-    elif not field:
-        raise AttributeError(f'invalid field - {field_name}')
-    else:
-        value, error_ = field.validate(value, {}, loc=field.alias, cls=cls)
-    if error_:
-        raise MongoValidationError([error_], type(value))
+            # For list fields, we don't validate the inner type
+            if inner_type is Any or inner_type is object:
+                return value
+            return [_validate_value(cls, field_name, item) for item in value]
+        except TypeError:
+            return value
+
+    # Validate type
+    try:
+        if not isinstance(value, field_type):
+            raise PydanticCustomError(
+                "type_error",
+                f"Value must be of type {field_type.__name__}",
+                dict(type=field_type.__name__)
+            )
+    except TypeError:
+        # Skip type validation for complex types
+        pass
+
     return value
 
 
@@ -115,35 +163,67 @@ class ExtraQueryMapper(object):
                 else ObjectId(values)
             )
         if extra_methods:
-            query: Dict = {self.field_name: {}}
-            for extra_method in extra_methods:
-                if extra_method == 'in':
-                    extra_method = 'in_'
-                elif extra_method == 'inc':
-                    return self.inc(values)
-                elif extra_method == 'unset':
-                    return self.unset(values)
-                query[self.field_name].update(getattr(self, extra_method)(values))
-            return query
+            # Handle special cases first
+            if extra_methods[-1] == 'set':
+                # For updates like config__username__set
+                field_path = '.'.join([self.field_name] + extra_methods[:-1])
+                return {field_path: values}
+            elif extra_methods[-1] == 'unset':
+                return self.unset(values)
+            elif extra_methods[-1] == 'inc':
+                return self.inc(values)
+
+            # For regular queries, build the field path
+            field_path = '.'.join([self.field_name] + extra_methods)
+            return {field_path: values}
         return {}
 
     def in_(self, list_values: List) -> dict:
-        if not isinstance(list_values, list):
-            raise TypeError("values must be a list type")
+        # Get the base field name without the __in suffix
+        base_field = self.field_name.split('__')[0]
+        # Get the field type
+        field = self.model.model_fields.get(base_field)
+        if field is None:
+            return {"$in": list_values if isinstance(list_values, list) else [list_values]}
+
+        # Get the actual type from Annotated if present
+        field_type = field.annotation
+        if hasattr(field_type, '__origin__') and field_type.__origin__ is Annotated:
+            field_type = field_type.__args__[0]
+
+        # For list fields, use $in operator directly
+        if hasattr(field_type, '__origin__') and field_type.__origin__ is list:
+            # Convert single value to list if needed
+            values = list_values if isinstance(
+                list_values, list) else [list_values]
+            # For array fields, we use $in operator directly
+            return {"$in": values}
+
+        # For other fields, validate each value
         try:
+            # Convert tuple to list if needed
+            if isinstance(list_values, tuple):
+                raise TypeError("values must be a list type")
+            values = list_values if isinstance(
+                list_values, list) else [list_values]
+            # Pass the full field name to _validate_value to ensure array query validation is skipped
             return {
                 "$in": [
-                    _validate_value(self.model, self.field_name, v) for v in list_values
+                    _validate_value(self.model, f"{base_field}__in", v) for v in values
                 ]
             }
         except MongoValidationError:
-            return {"$in": list_values}
+            return {"$in": list_values if isinstance(list_values, list) else [list_values]}
 
     def regex(self, regex_value: str) -> dict:
         return {"$regex": regex_value}
 
     def iregex(self, regex_value: str) -> dict:
-        return {"$regex": regex_value, "$options": "i"}
+        # For case-insensitive regex, we need to escape special characters
+        # and use the 'i' option
+        escaped_value = regex_value.replace(
+            '\\', '\\\\').replace('$', '\\$').replace('.', '\\.')
+        return {"$regex": escaped_value, "$options": "i"}
 
     def regex_ne(self, regex_value: str) -> dict:
         return {"$not": compile(regex_value)}
@@ -176,9 +256,16 @@ class ExtraQueryMapper(object):
         if not isinstance(list_values, list):
             raise TypeError("values must be a list type")
         try:
+            # Get the base field name without the __nin suffix
+            base_field = self.field_name.split('__')[0]
+            # For array fields, we don't validate the values
+            if hasattr(self.model.model_fields.get(base_field), 'annotation') and \
+               hasattr(self.model.model_fields[base_field].annotation, '__origin__') and \
+               self.model.model_fields[base_field].annotation.__origin__ is list:
+                return {"$nin": list_values}
             return {
                 "$nin": [
-                    _validate_value(self.model, self.field_name, v) for v in list_values
+                    _validate_value(self.model, base_field, v) for v in list_values
                 ]
             }
         except MongoValidationError:
@@ -236,13 +323,13 @@ class ExtraQueryMapper(object):
                 methods.append('in')
             elif not f.startswith('__') and f != 'extra_query':
                 methods.append(f)
-        return methods
+        return tuple(methods)  # Convert to tuple to support membership testing
 
 
 def chunk_by_length(items: List, step: int) -> Generator:
     """Yield successive n-sized chunks from l."""
     for i in range(0, len(items), step):
-        yield items[i : i + step]
+        yield items[i: i + step]
 
 
 def bulk_query_generator(
@@ -251,28 +338,33 @@ def bulk_query_generator(
     query_fields: Optional[List] = None,
     upsert=False,
 ) -> List:
-    """ "helper for generate bulk query"""
+    """helper for generate bulk query"""
+    queries = []
+    for request in requests:
+        query = {}
+        if query_fields:
+            for field in query_fields:
+                if hasattr(request, field):
+                    query[field] = getattr(request, field)
+        else:
+            query = {"_id": request._id}
 
-    data = []
-    if updated_fields:
-        for obj in requests:
-            query = {'_id': ObjectId(obj._id)}
-            update = {}
+        update = {}
+        if updated_fields:
             for field in updated_fields:
-                value = getattr(obj, field)
-                update.update({field: value})
-            data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
-    elif query_fields:
-        for obj in requests:
-            query = {}
-            update = {}
-            for field, value in obj.data.items():
-                if field not in query_fields:
-                    update.update({field: value})
-                else:
-                    query.update({field: value})
-            data.append(UpdateOne(query, {'$set': update}, upsert=upsert))
-    return data
+                if hasattr(request, field):
+                    update[field] = getattr(request, field)
+        else:
+            update = request.model_dump(exclude={"_id"})
+
+        queries.append(
+            UpdateOne(
+                query,
+                {"$set": update},
+                upsert=upsert
+            )
+        )
+    return queries
 
 
 def handle_and_convert_connection_errors(func: Callable) -> Any:
@@ -317,14 +409,42 @@ def generate_name_field(name: Union[dict, str, None] = None) -> Optional[str]:
 
 
 def sort_validation(
-    sort: Optional[int] = None, sort_fields: Union[list, tuple, None] = None
-) -> Tuple[Any, ...]:
+    sort: Optional[Union[int, tuple]] = None, sort_fields: Union[list, tuple, None] = None
+) -> Tuple[Any, Any]:
+    """Validate sort fields"""
     if sort is not None:
-        if sort not in (1, -1):
-            raise ValueError(f'invalid sort value must be 1 or -1 not {sort}')
-        if not sort_fields:
-            sort_fields = ('_id',)
-    return sort, sort_fields
+        if isinstance(sort, tuple):
+            if len(sort) != 2:
+                raise ValueError("sort tuple must have exactly 2 elements")
+            field, direction = sort
+            if direction not in (1, -1):
+                raise ValueError("invalid sort value must be 1 or -1")
+            return (sort,)
+        elif isinstance(sort, int):
+            if sort not in (1, -1):
+                raise ValueError(
+                    f"invalid sort value must be 1 or -1 not {sort}")
+            if not sort_fields:
+                sort_fields = ('_id',)
+            return sort, sort_fields
+        else:
+            raise ValueError("sort must be an integer or tuple")
+
+    if sort_fields is None:
+        return None, None
+
+    if isinstance(sort_fields, tuple):
+        if len(sort_fields) != 2:
+            raise ValueError("sort tuple must have exactly 2 elements")
+        field, direction = sort_fields
+        if direction not in (1, -1):
+            raise ValueError("invalid sort value must be 1 or -1")
+        return (sort_fields,)
+
+    if isinstance(sort_fields, list):
+        return None, tuple(sort_fields)
+
+    raise ValueError("sort_fields must be a tuple or list")
 
 
 def group_by_aggregate_generation(

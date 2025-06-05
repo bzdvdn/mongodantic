@@ -21,7 +21,7 @@ class QuerySet(object):
     @handle_and_convert_connection_errors
     def __iter__(self):
         for obj in self._data:
-            yield self._model.parse_obj(obj)
+            yield self._model.model_validate(obj)
 
     def __next__(self):
         return next(self.__iter__())
